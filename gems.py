@@ -1,5 +1,8 @@
 import galsim
 import numpy as np
+import os
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 random_seed = 15783
 
@@ -70,40 +73,61 @@ count = 0
 #creating the grid and placing galaxies on it
 for iy in range(ny_tiles):
     for ix in range(nx_tiles):
-        mag = tab[0][count]
-        n_sersic = tab[1][count]
-        r_half = tab[2][count]
-        if count < 14659:
-            count = count + 1
-        e1 = trunc_rayleigh(0.25, 0.7)
-        e2 = trunc_rayleigh(0.25, 0.7)
-        flux = gal_flux(mag)
-        #define galaxy with sersic profile
-        gal = galsim.Sersic(n = n_sersic, half_light_radius = r_half, flux = flux)
-        gal = gal.shear(e1=e1, e2=e2)
-        #define optical psf with Euclid condition 
-        image_psf = psf(600)+psf(700)+psf(800)+psf(900)
-        #create grid
-        b = galsim.BoundsI(ix*stamp_xsize+1, (ix+1)*stamp_xsize-1, iy*stamp_ysize+1, (iy+1)*stamp_ysize-1)
-        sub_gal_image = gal_image[b] 
-        sub_psf_image = psf_image[b]
-        rsq = 2 * shift_radius_sq
-        ud = galsim.UniformDeviate(random_seed + count + 1)
-        while (rsq > shift_radius_sq):
-            dx = (2*ud()-1) * shift_radius_sq
-            dy = (2*ud()-1) * shift_radius_sq
-            rsq = dx**2 + dy**2
-        #shift galaxies and psfs on the grid
-        gal = gal.shift(dx, dy)
-        psf1 = image_psf.shift(dx, dy)
-        #convolve galaxy and psf
-        final_gal = galsim.Convolve([psf1,gal])
-        final_gal.drawImage(sub_gal_image)
-        #add noise
-        rng = galsim.BaseDeviate(random_seed+count)
-        CCD_Noise = galsim.CCDNoise(rng, sky_level = sky_flux, gain = gain, read_noise = 4.2)
-        sub_gal_image.addNoise(CCD_Noise)
-        psf1.drawImage(sub_psf_image)
+        try:
+            mag = tab[0][count]
+            n_sersic = tab[1][count]
+            tru_sersicns = np.linspace(0.3, 6.0, 21)
+            tru_sersicn = tru_sersicns[(np.abs(tru_sersicns-n_sersic)).argmin()]
+            r_half = tab[2][count]
+            if count < 14659:
+                count = count + 1
+            e1 = trunc_rayleigh(0.25, 0.7)
+            e2 = trunc_rayleigh(0.25, 0.7)
+            flux = gal_flux(mag)
+            #define galaxy with sersic profile
+            gal = galsim.Sersic(n = n_sersic, half_light_radius = r_half, flux = flux)
+            gal = gal.shear(e1=e1, e2=e2)
+            #define optical psf with Euclid condition 
+            image_psf = psf(600)+psf(700)+psf(800)+psf(900)
+            #create grid
+            b = galsim.BoundsI(ix*stamp_xsize+1, (ix+1)*stamp_xsize-1, iy*stamp_ysize+1, (iy+1)*stamp_ysize-1)
+            sub_gal_image = gal_image[b] 
+            sub_psf_image = psf_image[b]
+            rsq = 2 * shift_radius_sq
+            ud = galsim.UniformDeviate(random_seed + count + 1)
+            while (rsq > shift_radius_sq):
+                dx = (2*ud()-1) * shift_radius_sq
+                dy = (2*ud()-1) * shift_radius_sq
+                rsq = dx**2 + dy**2
+            #shift galaxies and psfs on the grid
+            gal = gal.shift(dx, dy)
+            psf1 = image_psf.shift(dx, dy)
+            #convolve galaxy and psf
+            final_gal = galsim.Convolve([psf1,gal])
+            final_gal.drawImage(sub_gal_image)
+            #add noise
+            rng = galsim.BaseDeviate(random_seed+count)
+            CCD_Noise = galsim.CCDNoise(rng, sky_level = sky_flux, gain = gain, read_noise = 4.2)
+            sub_gal_image.addNoise(CCD_Noise)
+            psf1.drawImage(sub_psf_image)
+        except:
+            print(count)
+if not os.path.isdir('output'):
+    os.mkdir('output')
+file_name = os.path.join('output', 'Grid.fits')
+file_name_epsf = os.path.join('output','Grid_epsf.fits')
+gal_image.write(file_name)
+psf_image.write(file_name_epsf)
+
+
+
+plt.figure()
+# plt.axis([xmin, xmax, ymin, ymax])
+plt.imshow(gal_image.array, cmap='gray')
+#plt.imshow(image_data_psf.array, cmap='gray', norm=LogNorm())
+plt.colorbar(label = 'flux')
+plt.xlabel('x-axis [px]')
+plt.ylabel('y-axis [px]')
         
     
     
