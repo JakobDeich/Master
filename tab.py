@@ -1,8 +1,10 @@
+
 from astropy.table import Table
-import astropy.units as u
+from astropy.io import ascii
 import numpy as np
 import galsim
 import random
+import os
 #import numpy.random.Generator
 
 def trunc_rayleigh(sigma, max_val):
@@ -13,7 +15,7 @@ def trunc_rayleigh(sigma, max_val):
     return tmp
 
 
-def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize):
+def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     cat = galsim.Catalog('gems_20090807.fits')
     tab = np.zeros((12263,3))
     #print(cat.get(14659,'ST_MAG_GALFIT'))
@@ -64,8 +66,16 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize):
             
     
     t = Table()
-    t = Table([tab_1, tab_2, tab_3, tab_4, tab_5, bounds1, bounds2, bounds3, bounds4], names = ('mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_top', 'bound_y_bottom'), meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_xsize': stamp_xsize, 'stamp_ysize': stamp_ysize})
-    return t
+    t = Table([tab_1, tab_2, tab_3, tab_4, tab_5, bounds1, bounds2, bounds3, bounds4], names = ('mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_top', 'bound_y_bottom'), meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
+    if not os.path.isdir(path):
+            os.mkdir(path)
+    file_name = os.path.join(path, 'table.fits')
+    t.write( file_name , overwrite=True)  
+    return None
 
 
+# generate_table(5, 5, 40, 40, 'Test')
 
+# table = Table.read('Test/table.fits')
+
+# print(table.meta['STAMP_X'])

@@ -1,4 +1,5 @@
 import galsim
+from astropy.table import Table
 import numpy as np
 import os
 import tab
@@ -6,10 +7,7 @@ import time
 
 start = time.time()
 
-table = tab.generate_table(5,5,40,40)
-
-
-f = open('log.txt', 'w')
+# table = tab.generate_table(5,5,40,40)
 
 def generate_psf():
     psf = galsim.OpticalPSF(lam = 600, diam = 1.2, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
@@ -24,12 +22,13 @@ def gal_flux(mag):
     Z_p = 24.6
     return t_exp/gain *10**(-0.4*(mag-Z_p)) 
 
-def generate_image(table, path):
+def generate_image(path_table, path):
     random_seed = 15783
-    ny_tiles = table.meta['ny_tiles']
-    nx_tiles = table.meta['nx_tiles']
-    stamp_xsize = table.meta['stamp_xsize']
-    stamp_ysize = table.meta['stamp_ysize']
+    table = Table.read(path_table)
+    ny_tiles = table.meta['NY_TILES']
+    nx_tiles = table.meta['NX_TILES']
+    stamp_xsize = table.meta['STAMP_X']
+    stamp_ysize = table.meta['STAMP_Y']
     pixel_scale = 0.1 #arcsec/pixel
     pixel_scale_small = 0.02 #arcsec/pixel
     t_exp = 3*565 #s
@@ -37,7 +36,6 @@ def generate_image(table, path):
     mag_sky = 22.35
     Z_p = 24.6
     l_pix = 0.1 #arcsec
-    dummy = 0
     sky_flux = l_pix**2*t_exp/gain*10**(-0.4*(mag_sky-Z_p))
     gal_image = galsim.ImageF(stamp_xsize * nx_tiles-1, stamp_ysize * ny_tiles-1, scale = pixel_scale)
     #psf_image = galsim.ImageF(stamp_xsize * nx_tiles-1, stamp_ysize * ny_tiles-1, scale = pixel_scale_small)
@@ -48,8 +46,6 @@ def generate_image(table, path):
     for Galaxy in table:
         if count%1==0:
             print(count)
-            dummy = repr(count)
-            f.write(dummy)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
@@ -71,8 +67,6 @@ def generate_image(table, path):
             final_gal.drawImage(sub_gal_image)
         except:
             print('Error at galaxy ', count)
-            dummy = repr(count)
-            f.write(dummy)
         #add noise
         rng = galsim.BaseDeviate(random_seed + count)
         CCD_Noise = galsim.CCDNoise(rng, sky_level = sky_flux, gain = gain, read_noise = 4.2)
@@ -87,12 +81,9 @@ def generate_image(table, path):
     #psf_image.write(file_name_epsf)
     return None
 
-# generate_image(table, 'output')
+#generate_image('Test/table.fits', 'output')
 
 end = time.time()
 
 total_time = (end - start)/(60*60)  #run time in hours
 print('The system took ', total_time ,' hours to execute the function')
-total_time = repr(total_time)
-f.write(total_time)
-f.close()
