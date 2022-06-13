@@ -9,16 +9,16 @@ from astropy.visualization import astropy_mpl_style
 plt.style.use(astropy_mpl_style)
 #import image
 import tab
-from astropy.table import QTable
+from astropy.table import Table, Column
 
-table = tab.generate_table()
-#image.generate_image()
-image_file = 'output/Grid.fits'
-image_file_psf = 'output/Grid_epsf.fits'
+# table = tab.generate_table()
+# #image.generate_image()
+# image_file = 'output/Grid.fits'
+# image_file_psf = 'output/Grid_epsf.fits'
 
-gal_image = galsim.fits.read(image_file)
-psf_image = galsim.fits.read(image_file_psf)
-gal_image = gal_image.subsample(nx = 5,ny = 5)
+# gal_image = galsim.fits.read(image_file)
+# psf_image = galsim.fits.read(image_file_psf)
+# gal_image = gal_image.subsample(nx = 5,ny = 5)
 
 def gauss2d(x=0, y=0, mx=0, my=0, sx=1, sy=1):
 
@@ -107,7 +107,6 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
                 psm11= Xsm11/ denom - e1 * em1
                 psm22= Xsm11/ denom - e2 * em2
                 psm12= Xsm12/ denom - 0.5 * (e1 * em2 + e2 * em1)
-                #here multiply with bsm? 
                 
                 
                 psh11= Xsh11 / denom - e1 * eh1
@@ -126,18 +125,27 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
 
                 return ksbpar
             
-def calculate_ksb():
+def calculate_ksb(path):
+    table = Table.read(path + '/table.fits')
+    image_file = path + '/Grid.fits'
+    gal_image = galsim.fits.read(image_file)
+    gal_image = gal_image.subsample(nx = 5,ny = 5)
     tab2 = []
     tab3 = []
-    for i in range(10000):
-        b = table[i][1]
+    for Galaxy in table:
+        b = galsim.BoundsI(Galaxy['bound_x_left']*5, Galaxy['bound_x_right']*5, Galaxy['bound_y_top']*5, Galaxy['bound_y_bottom']*5)
         sub_gal_image = gal_image[b] 
-        sub_psf_image = psf_image[b]
+        #sub_psf_image = psf_image[b]
         ksb_mom = ksb_moments(sub_gal_image.array)
         tab2.append(ksb_mom['e1'])
         tab3.append(ksb_mom['e2'])
-    print(tab2)
-    tab = table[i][0]
-    t = QTable([tab, tab2, tab3])
-    return t
-Test = calculate_ksb()
+    Col_A = Column(name='e1_cal', data=tab2)
+    Col_B = Column(name='e2_cal', data=tab3)
+    try:
+        table.add_columns([Col_A, Col_B])
+    except:
+        table.replace_column(name = 'e1_cal', col = Col_A)
+        table.replace_column(name = 'e2_cal', col = Col_B)
+    table.write( path + '/table.fits' , overwrite=True)  
+    return None
+calculate_ksb('output2')
