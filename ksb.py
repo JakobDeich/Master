@@ -3,6 +3,7 @@ from astropy.io import fits
 import sys
 import os
 import math
+import logging 
 import galsim
 import matplotlib.pyplot as plt
 from astropy.visualization import astropy_mpl_style
@@ -126,12 +127,17 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
                 return ksbpar
             
 def calculate_ksb(path):
+    log_format = '%(asctime)s %(filename)s: %(message)s'
+    logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     table = Table.read(path + '/table.fits')
+    logging.info('Read in table from %s /table.fits' %path)
     image_file = path + '/Grid.fits'
     gal_image = galsim.fits.read(image_file)
     gal_image = gal_image.subsample(nx = 5,ny = 5)
+    logging.info('galaxy image subsampled into 5x5 pixels')
     tab2 = []
     tab3 = []
+    logging.info('start ksb algorithm')
     for Galaxy in table:
         b = galsim.BoundsI(Galaxy['bound_x_left']*5, Galaxy['bound_x_right']*5, Galaxy['bound_y_top']*5, Galaxy['bound_y_bottom']*5)
         sub_gal_image = gal_image[b] 
@@ -143,9 +149,12 @@ def calculate_ksb(path):
     Col_B = Column(name='e2_cal', data=tab3)
     try:
         table.add_columns([Col_A, Col_B])
+        logging.info('Add columns to table')
     except:
         table.replace_column(name = 'e1_cal', col = Col_A)
         table.replace_column(name = 'e2_cal', col = Col_B)
+        logging.info('replaced columns in table')
     table.write( path + '/table.fits' , overwrite=True)  
+    logging.info('overwritten old table with new table including e1 and e2')
     return None
 calculate_ksb('output2')

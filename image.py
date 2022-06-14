@@ -4,6 +4,7 @@ import numpy as np
 import os
 import tab
 import time
+import logging
 
 start = time.time()
 
@@ -23,6 +24,9 @@ def gal_flux(mag):
     return t_exp/gain *10**(-0.4*(mag-Z_p)) 
 
 def generate_image(path_table, path):
+    log_format = '%(asctime)s %(filename)s: %(message)s'
+    logging.basicConfig(filename='image.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+    logging.info('Start generating grid')
     random_seed = 15783
     table = Table.read(path_table)
     ny_tiles = table.meta['NY_TILES']
@@ -67,18 +71,21 @@ def generate_image(path_table, path):
             final_gal.drawImage(sub_gal_image)
         except:
             print('Error at galaxy ', count)
+            logging.error('Error at galaxy %d with elipticities e1 = %f and e2 = %f' %count %Galaxy['e1'] % Galaxy['e2'])
         #add noise
         rng = galsim.BaseDeviate(random_seed + count)
         CCD_Noise = galsim.CCDNoise(rng, sky_level = sky_flux, gain = gain, read_noise = 4.2)
         sub_gal_image.addNoise(CCD_Noise)
         count = count + 1
         #psf1.drawImage(sub_psf_image)
+    logging.info('finished generating grid')
     if not os.path.isdir(path):
             os.mkdir(path)
     file_name = os.path.join(path, 'Grid.fits')
     #file_name_epsf = os.path.join('output','Grid_epsf.fits')
     gal_image.write(file_name)
     #psf_image.write(file_name_epsf)
+    logging.info('Grid saved in File at %s /Grid.fits' %path)
     return None
 
 #generate_image('Test/table.fits', 'output')
