@@ -66,7 +66,7 @@ def generate_image(path_table, path, gamma):
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
-        gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
+        gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half']*pixel_scale, flux = flux)
         gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
         phi = rng1.choice(180)
         gamma1 = gamma*np.cos(2*phi)
@@ -100,7 +100,7 @@ def generate_image(path_table, path, gamma):
     logging.info('Grid saved in File at %s/Grid.fits' %path)
     return None
 
-#generate_image('Test/table.fits', 'output', 0.3)
+generate_image('Test/table.fits', 'output', 0.3)
 
 end = time.time()
 
