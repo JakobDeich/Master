@@ -1,11 +1,12 @@
 import galsim
-from astropy.table import Table
+from astropy.table import Table, Column
 import numpy as np
 import os
 import tab
 import time
 import logging
-
+import astropy.units
+import coord
 start = time.time()
 
 # table = tab.generate_table(5,5,40,40)
@@ -37,7 +38,7 @@ def generate_psf_image(path_table):
     psf_image.write(file_name)
     return None
     
-def generate_image(path_table, path, gamma):
+def generate_image(path_table, path):
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='image.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     logging.info('Start generating grid')
@@ -47,6 +48,7 @@ def generate_image(path_table, path, gamma):
     nx_tiles = table.meta['NX_TILES']
     stamp_xsize = table.meta['STAMP_X']
     stamp_ysize = table.meta['STAMP_Y']
+    N = table.meta['N']
     pixel_scale = 0.1 #arcsec/pixel
     t_exp = 3*565 #s
     gain = 3.1 #e/ADU
@@ -54,24 +56,20 @@ def generate_image(path_table, path, gamma):
     Z_p = 24.6
     l_pix = 0.1 #arcsec
     sky_flux = l_pix**2*t_exp/gain*10**(-0.4*(mag_sky-Z_p))
-    gal_image = galsim.ImageF(stamp_xsize * nx_tiles-1, stamp_ysize * ny_tiles-1, scale = pixel_scale)
+    gal_image = galsim.ImageF((stamp_xsize * nx_tiles-1)*2+1, stamp_ysize * ny_tiles-1, scale = pixel_scale)
     #define optical psf with Euclid condition 
     psf = generate_psf()
-    rng1 = np.random.default_rng()
     #creating the grid and placing galaxies on it
     count = 0
     for Galaxy in table:
-        if count%1==0:
+        if count%100==0:
             print(count)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
-        gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half']*pixel_scale, flux = flux)
+        gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
         gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
-        phi = rng1.choice(180)
-        gamma1 = gamma*np.cos(2*phi)
-        gamma2 = gamma*np.sin(2*phi)
-        gal = gal.shear(g1 = gamma1, g2 = gamma2)
+        gal = gal.shear(g1 = Galaxy['gamma1'], g2 = Galaxy['gamma2'])
         #create grid
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
         sub_gal_image = gal_image[b] 
@@ -82,6 +80,8 @@ def generate_image(path_table, path, gamma):
         gal = gal.shift(dx, dy)
         #convolve galaxy and psf                          
         final_gal = galsim.Convolve([psf,gal], gsparams = gs)
+        if (Galaxy['rotation'] == 1):
+            final_gal = final_gal.rotate(galsim.Angle(theta = 90, unit = coord.degrees))
         try:
             final_gal.drawImage(sub_gal_image)
         except:
@@ -100,7 +100,7 @@ def generate_image(path_table, path, gamma):
     logging.info('Grid saved in File at %s/Grid.fits' %path)
     return None
 
-generate_image('Test/table.fits', 'output', 0.3)
+#generate_image('Test/table.fits', 'output')
 
 end = time.time()
 

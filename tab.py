@@ -5,6 +5,8 @@ import numpy as np
 import galsim
 import random
 import os
+import logging
+import time
 #import numpy.random.Generator
 
 def trunc_rayleigh(sigma, max_val):
@@ -16,57 +18,53 @@ def trunc_rayleigh(sigma, max_val):
 
 
 def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
+    log_format = '%(asctime)s %(filename)s: %(message)s'
+    logging.basicConfig(filename='tab.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     cat = galsim.Catalog('gems_20090807.fits')
-    tab = np.zeros((12263,3))
+    logging.info('Start')
+    logging.info('downloaded GEMS catalog')
+    tab = np.zeros((14046,3))
+    GammaTable = Table.read('/vol/aibn1053/data1/jdeich/work_master/Gamma.fits')
+    gamma1 = GammaTable.meta['GAMMA1']
+    gamma2 = GammaTable.meta['GAMMA2']
     #print(cat.get(14659,'ST_MAG_GALFIT'))
     count = 0
     N = ny_tiles*nx_tiles
     #rng = galsim.BaseDeviate(random_seed + i + 1)
     #selecting galaxies and storing their parameters 
     for i in range(cat.nobjects):
-        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 25.0) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 4.0) and (5.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
+        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 25.0) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 6.0) and (3.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
             tab[count][0] = cat.get(i, 'ST_MAG_GALFIT')  #magnitude
             tab[count][1] = cat.get(i, 'ST_N_GALFIT')  #Sersic index
-            tab[count][2] = cat.get(i, 'ST_RE_GALFIT')  # Half-light radius
+            tab[count][2] = cat.get(i, 'ST_RE_GALFIT')*0.03  # Half-light radius in arcsec
             count = count + 1
+    logging.info('filtered GEMS catalog with cuts')
     rng = np.random.default_rng()
     tab_random = rng.choice(tab, size = N)
-    
-    bounds1 = np.zeros(N)
-    bounds2 = np.zeros(N)
-    bounds3 = np.zeros(N)
-    bounds4 = np.zeros(N)
-    tab_1 = np.zeros(N)
-    tab_2 = np.zeros(N)
-    tab_3 = np.zeros(N)
-    tab_4 = np.zeros(N)
-    tab_5 = np.zeros(N)
-    for i in range(N):
-        tab_1[i] = tab_random[i][0]
-        tab_2[i] = tab_random[i][1]
-        tru_sersicns = np.linspace(0.3, 6.0, 21)
-        tab_2[i] = tru_sersicns[(np.abs(tru_sersicns-tab_2[i])).argmin()]
-        tab_3[i] = tab_random[i][2]
-        e_betrag = trunc_rayleigh(0.25, 0.7)  
-        phi = rng.choice(180)
-        e1 = e_betrag*np.cos(2*phi)
-        e2 = e_betrag*np.sin(2*phi)
-        tab_4[i] = e1
-        tab_5[i] = e2   
-    
-    
-    count = 0
+    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'gamma2', 'bound_x_left', 'bound_x_right', 'bound_y_top', 'bound_y_bottom', 'rotation'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'i4'], meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'N': N})
+    i = 0
     for iy in range(ny_tiles):
         for ix in range(nx_tiles):
-            bounds1[count] = ix*stamp_xsize+1
-            bounds2[count] = (ix+1)*stamp_xsize-1
-            bounds3[count] = iy*stamp_ysize+1
-            bounds4[count] = (iy+1)*stamp_ysize-1
-            count = count + 1
-            
-    
-    t = Table()
-    t = Table([tab_1, tab_2, tab_3, tab_4, tab_5, bounds1, bounds2, bounds3, bounds4], names = ('mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_top', 'bound_y_bottom'), meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
+            bound1 = ix*stamp_xsize+1
+            bound2 = (ix+1)*stamp_xsize-1
+            bound3 = iy*stamp_ysize+1
+            bound4 = (iy+1)*stamp_ysize-1
+            mag = tab_random[i][0]
+            n_ser = tab_random[i][1]
+            tru_sersicns = np.linspace(0.3, 6.0, 21)
+            n_ser= tru_sersicns[(np.abs(tru_sersicns-n_ser)).argmin()]
+            r_half = tab_random[i][2]
+            e_betrag = trunc_rayleigh(0.25, 0.7)  
+            phi = rng.choice(180)
+            e1 = e_betrag*np.cos(2*phi)
+            e2 = e_betrag*np.sin(2*phi)
+            params = [mag, n_ser, r_half, e1, e2, gamma1, gamma2, bound1, bound2, bound3, bound4, 0]
+            t.add_row(params)
+            params = [mag, n_ser, r_half, e1, e2, gamma1, gamma2, stamp_xsize* nx_tiles + bound1,stamp_xsize* nx_tiles + bound2, bound3, bound4, 1]
+            t.add_row(params)
+            i = i + 1
+    logging.info('%d galaxies and their parameters were drawn randomly from GEMS catalog' %N)
+    logging.info('data was written in fits file and can be used to simulate galaxies')
     if not os.path.isdir(path):
             os.mkdir(path)
     file_name = os.path.join(path, 'table.fits')
@@ -74,7 +72,7 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     return None
 
 
-# generate_table(5, 5, 40, 40, 'Test')
+generate_table(100, 100, 40, 40, 'Test')
 
 # table = Table.read('Test/table.fits')
 
