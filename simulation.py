@@ -3,48 +3,66 @@ import galsim
 import numpy as np
 from multiprocessing import Pool, cpu_count
 import os
-import shutil
 import tab
 import image
 import logging
 import time
-
+import ksb
 import config
+from astropy.table import Table
 
 start = time.time()
 
-def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', dirname='test'):   
+def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', dirname='test', gamma1 = 0, gamma2 = 0):   
     mydir = config.workpath(dirname)
-    mylogpath = os.path.join(mydir, "generate_simulation.log")
-    log_format = '%(asctime)s %(filename)s: %(message)s'
-    logging.basicConfig(filename=mylogpath, format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
-    logging.info('started simulation')
+    # mylogpath = os.path.join(mydir, "generate_simulation.log")
+    # log_format = '%(asctime)s %(filename)s: %(message)s'
+    # logging.basicConfig(filename=mylogpath, format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+    # logging.info('started simulation')
     if only_one_table == True:
-        logging.info('Simulation uses only one randomly drawn table of galaxy parameters for the generated grid')
-        image.generate_image(path_table, mydir)
-        shutil.copyfile(path_table, mydir + '/table.fits')
+        #logging.info('Simulation uses only one randomly drawn table of galaxy parameters for the generated grid')
+        t = Table.read(path_table)
+        tab.generate_gamma_tab(mydir, gamma1, gamma2)
+        file_name = os.path.join(mydir, '/table.fits')
+        t.write(file_name, overwrite = True)
+        image.generate_image(mydir + '/table.fits', mydir)
     else:
-        logging.info('Simulation generates a new randomly drawn table of galaxy parameters for the grid')
+        #logging.info('Simulation generates a new randomly drawn table of galaxy parameters for the grid')
+        tab.generate_gamma_tab(mydir, gamma1, gamma2)
         tab.generate_table(5,5,40,40, mydir)
         image.generate_image(mydir + '/table.fits', mydir)
     return None
 
+#ksb.calculate_ksb(mydir) #getrennt
 #generate_simulation(True, 'Test/table.fits', 'output1')
 #image.generate_psf_image('Test/table.fits')
 
-def main(N):
-    runname = "output"
+def simulate_Grids(N):
+    runname = "Test"
     final = []
+    Gammas = np.linspace(-0.1, 0.1, 20)
+    gamma1 = 0
     for i in range(N):
-        params = [True,'Test/table.fits' ,runname+"_" + str(i+1)]
+        gamma1 = Gammas[i]
+        params = [False,'Test/table.fits' ,runname + "_" + str(i+1), gamma1, 0]
         final.append(params)
     with Pool() as pool:
         pool.starmap(generate_simulation, final)
 
 
 
-if __name__ == '__main__':
-    main(3)
+def calculate_shear(N):
+    runname = 'Test'
+    final = []
+    for i in range(N):
+        params = [config.workpath(runname + '_' + str(i+1))]
+        final.append(params)
+    with Pool() as pool:
+        pool.starmap(ksb.calculate_ksb, final)
+
+#simulate_Grids(20)
+calculate_shear(20)
+
 
 end = time.time()
 total_time = (end - start)/(60*60)  #run time in hours

@@ -10,6 +10,7 @@ from astropy.visualization import astropy_mpl_style
 plt.style.use(astropy_mpl_style)
 #import image
 import tab
+import config
 from astropy.table import Table, Column
 
 # table = tab.generate_table()
@@ -130,29 +131,27 @@ def calculate_ksb(path):
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     # table = Table.read(path + '/table.fits')
-    table = Table.read('Test/table.fits')
+    table = Table.read(path + '/Input_data.fits')
     logging.info('Read in table from %s /table.fits' %path)
     image_file = path + '/Grid.fits'
     gal_image = galsim.fits.read(image_file)
     ny = table.meta['NY_TILES']
     nx = table.meta['NX_TILES']
-    gal_image = gal_image.subsample(nx = nx,ny = ny) #in for loop nach bounds
-    logging.info('galaxy image subsampled into %s x %s pixels' %(nx, ny))
     tab2 = []
     tab3 = []
     logging.info('start ksb algorithm')
-    dum = 0
-    for Galaxy in table:
-        b = galsim.BoundsI(Galaxy['bound_x_left']*5, Galaxy['bound_x_right']*5, Galaxy['bound_y_top']*5, Galaxy['bound_y_bottom']*5)
+    count = 0
+    for Galaxy in table:        
+        if count%100==0:
+            logging.warning('Galaxy number %i' %count)
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
         sub_gal_image = gal_image[b] 
+        sub_gal_image = sub_gal_image.subsample(nx = nx,ny = ny)
         #sub_psf_image = psf_image[b]
         ksb_mom = ksb_moments(sub_gal_image.array)
-        shear = galsim.Shear(e1 = ksb_mom['e1'], e2 = ksb_mom['e2'])
-        dum = dum + np.sqrt(shear._g.real**2+shear._g.imag**2)
         tab2.append(ksb_mom['e1'])
         tab3.append(ksb_mom['e2'])
-    dum = dum/(nx*ny*2)
-    print(dum)
+        count = count +1 
     Col_A = Column(name='e1_cal', data=tab2)
     Col_B = Column(name='e2_cal', data=tab3)
     try:
@@ -162,7 +161,8 @@ def calculate_ksb(path):
         table.replace_column(name = 'e1_cal', col = Col_A)
         table.replace_column(name = 'e2_cal', col = Col_B)
         logging.info('replaced columns in table')
-    table.write( path + '/table.fits' , overwrite=True)  
+    table.write( path + '/Measured.fits' , overwrite=True)  #Namen aendern
     logging.info('overwritten old table with new table including e1 and e2')
     return None
-calculate_ksb('output')
+#mydir = config.workpath('output_1')
+# calculate_ksb(mydir)

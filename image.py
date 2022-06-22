@@ -44,6 +44,9 @@ def generate_image(path_table, path):
     logging.info('Start generating grid')
     random_seed = 15783
     table = Table.read(path_table)
+    Gamma = Table.read(path + '/Gamma.fits')
+    gamma1 = Gamma['gamma1']
+    gamma2 = Gamma['gamma2']
     ny_tiles = table.meta['NY_TILES']
     nx_tiles = table.meta['NX_TILES']
     stamp_xsize = table.meta['STAMP_X']
@@ -62,14 +65,14 @@ def generate_image(path_table, path):
     #creating the grid and placing galaxies on it
     count = 0
     for Galaxy in table:
-        if count%100==0:
+        if count%10==0:
             print(count)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
         gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
         gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
-        gal = gal.shear(g1 = Galaxy['gamma1'], g2 = Galaxy['gamma2'])
+        gal = gal.shear(g1 = gamma1, g2 = gamma2)
         #create grid
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
         sub_gal_image = gal_image[b] 
@@ -86,7 +89,7 @@ def generate_image(path_table, path):
             final_gal.drawImage(sub_gal_image)
         except:
             print('Error at galaxy ', count)
-            logging.error('Error at galaxy %d with elipticities e1 = %f and e2 = %f' %count %Galaxy['e1'] % Galaxy['e2'])
+            logging.error('Error at galaxy %d with elipticities e1 = %f and e2 = %f' %(count, Galaxy['e1'], Galaxy['e2']))
         #add noise
         rng = galsim.BaseDeviate(random_seed + count)
         CCD_Noise = galsim.CCDNoise(rng, sky_level = sky_flux, gain = gain, read_noise = 4.2)
@@ -100,7 +103,7 @@ def generate_image(path_table, path):
     logging.info('Grid saved in File at %s/Grid.fits' %path)
     return None
 
-#generate_image('Test/table.fits', 'output')
+#generate_image('Test/table.fits', 'Test')
 
 end = time.time()
 
