@@ -7,6 +7,7 @@ import time
 import logging
 import astropy.units
 import coord
+import config
 start = time.time()
 
 # table = tab.generate_table(5,5,40,40)
@@ -24,19 +25,18 @@ def gal_flux(mag):
     Z_p = 24.6
     return t_exp/gain *10**(-0.4*(mag-Z_p)) 
 
-def generate_psf_image(path_table):
-    table = Table.read(path_table)
+def generate_psf_image(path):
+    table = Table.read(path + '/Input_data.fits')
     stamp_xsize = table.meta['STAMP_X']
     stamp_ysize = table.meta['STAMP_Y']
     pixel_scale_small = 0.02 
     psf_image = galsim.ImageF(stamp_xsize, stamp_ysize, scale = pixel_scale_small)
     psf = generate_psf()
     psf.drawImage(psf_image)
-    if not os.path.isdir('PSF'):
-            os.mkdir('PSF')
-    file_name = os.path.join('PSF', 'PSF.fits')
+    file_name = os.path.join(path, 'PSF.fits')
     psf_image.write(file_name)
     return None
+
     
 def generate_image(path_table, path):
     log_format = '%(asctime)s %(filename)s: %(message)s'
@@ -65,14 +65,13 @@ def generate_image(path_table, path):
     #creating the grid and placing galaxies on it
     count = 0
     for Galaxy in table:
-        if count%10==0:
+        if count%400==0:
             print(count)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
         gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
         gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
-        gal = gal.shear(g1 = gamma1, g2 = gamma2)
         #create grid
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
         sub_gal_image = gal_image[b] 
@@ -85,6 +84,7 @@ def generate_image(path_table, path):
         final_gal = galsim.Convolve([psf,gal], gsparams = gs)
         if (Galaxy['rotation'] == 1):
             final_gal = final_gal.rotate(galsim.Angle(theta = 90, unit = coord.degrees))
+        final_gal = final_gal.shear(g1 = gamma1, g2 = gamma2)
         try:
             final_gal.drawImage(sub_gal_image)
         except:
@@ -103,7 +103,8 @@ def generate_image(path_table, path):
     logging.info('Grid saved in File at %s/Grid.fits' %path)
     return None
 
-#generate_image('Test/table.fits', 'Test')
+#generate_image('Test/Input_data.fits', 'Test')
+#generate_psf_image('Test')
 
 end = time.time()
 

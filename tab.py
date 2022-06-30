@@ -79,9 +79,9 @@ def generate_gamma_tab(path, gamma1, gamma2 = 0):
     file_name = os.path.join(path, 'Gamma.fits')
     t.write( file_name , overwrite=True)  
 
-#generate_gamma_tab('Test', 0.1)
-# generate_table(5, 5, 40, 40, 'Test')
+# generate_gamma_tab('Test', 0.2)
+#generate_table(1, 1, 60, 60, 'Test')
 
-# table = Table.read('Test/table.fits')
+# table = Table.read('Test/Input_data.fits')
 
-# print(table.meta['STAMP_X'])
+# print(table)

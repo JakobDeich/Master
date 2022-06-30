@@ -11,6 +11,7 @@ plt.style.use(astropy_mpl_style)
 #import image
 import tab
 import config
+import image
 from astropy.table import Table, Column
 
 # table = tab.generate_table()
@@ -126,8 +127,14 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
                 ksbpar['Psh22']=psh22
 
                 return ksbpar
+   
             
+    # e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+    # e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
 def calculate_ksb(path):
+    image.generate_psf_image(path)
+    PSF = galsim.fits.read(path + '/PSF.fits')
+    meas_on_psf = ksb_moments(PSF.array)
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     # table = Table.read(path + '/table.fits')
@@ -135,25 +142,30 @@ def calculate_ksb(path):
     logging.info('Read in table from %s /table.fits' %path)
     image_file = path + '/Grid.fits'
     gal_image = galsim.fits.read(image_file)
-    ny = table.meta['NY_TILES']
-    nx = table.meta['NX_TILES']
+    # ny = table.meta['NY_TILES']
+    # nx = table.meta['NX_TILES']
     tab2 = []
     tab3 = []
     logging.info('start ksb algorithm')
     count = 0
     for Galaxy in table:        
-        if count%100==0:
+        if count%1000==0:
             logging.warning('Galaxy number %i' %count)
+            print(str(count) + ' Galaxies examined')
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
         sub_gal_image = gal_image[b] 
-        sub_gal_image = sub_gal_image.subsample(nx = nx,ny = ny)
+        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
         #sub_psf_image = psf_image[b]
-        ksb_mom = ksb_moments(sub_gal_image.array)
-        tab2.append(ksb_mom['e1'])
-        tab3.append(ksb_mom['e2'])
+        meas_on_galaxy = ksb_moments(sub_gal_image.array)
+        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+        e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
+        P_g11 = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
+        P_g22 = meas_on_galaxy['Psh22']-meas_on_galaxy['Psm22']/meas_on_psf['Psm22']*meas_on_psf['Psh22']
+        tab2.append((meas_on_galaxy['e1'] - e1_anisotropy_correction)/P_g11)
+        tab3.append((meas_on_galaxy['e2'] - e2_anisotropy_correction)/P_g22)
         count = count +1 
-    Col_A = Column(name='e1_cal', data=tab2)
-    Col_B = Column(name='e2_cal', data=tab3)
+    Col_A = Column(name='g1_cal', data=tab2)
+    Col_B = Column(name='g2_cal', data=tab3)
     try:
         table.add_columns([Col_A, Col_B])
         logging.info('Add columns to table')
@@ -161,8 +173,58 @@ def calculate_ksb(path):
         table.replace_column(name = 'e1_cal', col = Col_A)
         table.replace_column(name = 'e2_cal', col = Col_B)
         logging.info('replaced columns in table')
-    table.write( path + '/Measured.fits' , overwrite=True)  #Namen aendern
+    table.write( path + '/Measured_ksb.fits' , overwrite=True) 
+    logging.info('overwritten old table with new table including e1_cal and e2_cal')
+    return None
+
+def calculate_ksb_galsim(path):
+    image.generate_psf_image(path)
+    PSF = galsim.fits.read(path + '/PSF.fits')
+    log_format = '%(asctime)s %(filename)s: %(message)s'
+    logging.basicConfig(filename='ksb_galsim.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+    # table = Table.read(path + '/table.fits')
+    table = Table.read(path + '/Input_data.fits')
+    logging.info('Read in table from %s /table.fits' %path)
+    image_file = path + '/Grid.fits'
+    gal_image = galsim.fits.read(image_file)
+    # ny = table.meta['NY_TILES']
+    # nx = table.meta['NX_TILES']
+    tab2 = []
+    tab3 = []
+    logging.info('start ksb algorithm')
+    count = 0
+    n_fail = 0
+    for Galaxy in table:        
+        if count%100==0:
+            logging.warning('Galaxy number %i' %count)
+            print(str(count) + ' Galaxies examined')
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
+        sub_gal_image = gal_image[b] 
+        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+        try:
+            results = galsim.hsm.EstimateShear(sub_gal_image, PSF)
+            tab2.append(results.observed_shape._g.real)
+            tab3.append(results.observed_shape._g.imag)
+        except:
+            n_fail += 1
+            tab2.append(-10)
+            tab3.append(-10)
+        count = count +1 
+    Col_A = Column(name='g1_cal_galsim', data=tab2)
+    Col_B = Column(name='g2_cal_galsim', data=tab3)
+    print(n_fail)
+    try:
+        table.add_columns([Col_A, Col_B])
+        logging.info('Add columns to table')
+    except:
+        table.replace_column(name = 'Shear_cal_gal', col = Col_A)
+        table.replace_column(name = 'e2_cal_galsim', col = Col_B)
+        logging.info('replaced columns in table')
+    table.write( path + '/Measured_galsim.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1 and e2')
     return None
-#mydir = config.workpath('output_1')
+# mydir = config.workpath('Test_1')
 # calculate_ksb(mydir)
+
+
+# calculate_ksb_galsim('Test')

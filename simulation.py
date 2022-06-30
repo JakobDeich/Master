@@ -23,14 +23,14 @@ def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', 
         #logging.info('Simulation uses only one randomly drawn table of galaxy parameters for the generated grid')
         t = Table.read(path_table)
         tab.generate_gamma_tab(mydir, gamma1, gamma2)
-        file_name = os.path.join(mydir, '/table.fits')
+        file_name = os.path.join(mydir, '/Input_data.fits')
         t.write(file_name, overwrite = True)
-        image.generate_image(mydir + '/table.fits', mydir)
+        image.generate_image(mydir + '/Input_data.fits', mydir)
     else:
         #logging.info('Simulation generates a new randomly drawn table of galaxy parameters for the grid')
         tab.generate_gamma_tab(mydir, gamma1, gamma2)
-        tab.generate_table(5,5,40,40, mydir)
-        image.generate_image(mydir + '/table.fits', mydir)
+        tab.generate_table(50,50,50,50, mydir)
+        image.generate_image(mydir + '/Input_data.fits', mydir)
     return None
 
 #ksb.calculate_ksb(mydir) #getrennt
@@ -40,15 +40,24 @@ def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', 
 def simulate_Grids(N):
     runname = "Test"
     final = []
-    Gammas = np.linspace(-0.1, 0.1, 20)
+    Gammas = np.linspace(-0.1, 0.1, N)
     gamma1 = 0
     for i in range(N):
         gamma1 = Gammas[i]
-        params = [False,'Test/table.fits' ,runname + "_" + str(i+1), gamma1, 0]
+        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0]
         final.append(params)
     with Pool() as pool:
         pool.starmap(generate_simulation, final)
 
+
+def calculate_shear_galsim(N):
+    runname = 'Test'
+    final = []
+    for i in range(N):
+        params = [config.workpath(runname + '_' + str(i+1))]
+        final.append(params)
+    with Pool() as pool:
+        pool.starmap(ksb.calculate_ksb_galsim, final)
 
 
 def calculate_shear(N):
@@ -60,9 +69,9 @@ def calculate_shear(N):
     with Pool() as pool:
         pool.starmap(ksb.calculate_ksb, final)
 
-#simulate_Grids(20)
+simulate_Grids(20)
+calculate_shear_galsim(20)
 calculate_shear(20)
-
 
 end = time.time()
 total_time = (end - start)/(60*60)  #run time in hours
