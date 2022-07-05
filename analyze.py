@@ -20,7 +20,7 @@ gamma_cal = []
 #     dum1 = []
 #     dum2 = []
 #     for Galaxy in table:
-#         if Galaxy['rotation'] == 0 and np.sqrt(Galaxy['e1_cal']**2 + Galaxy['e2_cal']**2) < 1:
+#         if np.sqrt(Galaxy['e1_cal']**2 + Galaxy['e2_cal']**2) < 1:
 #             dum1.append(Galaxy['e1_cal'])
 #     for Galaxy in Gamma:
 #         dum2.append(Galaxy['gamma1'])
@@ -40,7 +40,7 @@ gamma_cal = []
 #     table = Table.read(path)
 #     dum1 = []
 #     for Galaxy in table:
-#         if Galaxy['rotation'] == 0 and np.sqrt(Galaxy['e1_cal']**2 + Galaxy['e2_cal']**2) < 1:
+#         if np.sqrt(Galaxy['e1_cal']**2 + Galaxy['e2_cal']**2) < 1:
 #             dum1.append(Galaxy['e1_cal'])
 #         # print(Galaxy['e1_cal'])
 #     mean1 = statistics.mean(dum1)
@@ -53,18 +53,23 @@ for i in range(20):
     Gamma = Table.read(path2)
     dum1 = []
     dum2 = []
+    dum3 = []
     for Galaxy in table:
-        if np.sqrt(Galaxy['e1_cal']**2 + Galaxy['e2_cal']**2) < 1:
-            gamma1 = Galaxy['g1_cal']
-            gamma2 = Galaxy['g2_cal']
-            #print(gamma1)
-            dum1.append(gamma1)
+        #if np.sqrt(Galaxy['g1_cal']**2 + Galaxy['g2_cal']**2) < 0.7:
+        if np.sqrt(Galaxy['e1_cal']**2 + Galaxy['e2_cal']**2) < 0.7 and Galaxy['Pg_11'] > 0.03:
+            e1 = Galaxy['e1_cal']
+            e2 = Galaxy['e2_cal']
+            Pg_11 = Galaxy['Pg_11']
+            dum1.append(e1)
+            dum3.append(Pg_11)
         
     for Galaxy in Gamma:
         # gamma2 = shear._g.imag
         dum2.append(Galaxy['gamma1'])
     mean1 = statistics.mean(dum1)
-    gamma_cal.append(mean1)
+    mean3 = statistics.mean(dum3)
+    print(mean3)
+    gamma_cal.append(mean1/mean3)
     mean2 = statistics.mean(dum2)
     gamma_real.append(mean2)
 
@@ -77,7 +82,7 @@ for i in range(20):
 #     dum1 = []
 #     dum2 = []
 #     for Galaxy in table:
-#         if Galaxy['g1_cal_galsim'] > -10 and Galaxy['rotation'] == 0:
+#         if Galaxy['g1_cal_galsim'] > -10:
 #             # shear = galsim.Shear(e1 = Galaxy['e1_cal_galsim'], e2 = Galaxy['e2_cal_galsim'])
 #             gamma1 = Galaxy['g1_cal_galsim']
 #             gamma2 = Galaxy['g2_cal_galsim']
@@ -103,7 +108,7 @@ print(z)
 plt.plot(g, linear(g, m, b))
 plt.xlabel('shear $g\_{input}$')
 plt.ylabel('shear $g\_{output}$')
-plt.title('$\mu$ = ' + str(m) + '  $c$ = ' + str(b))
+plt.title('$\mu$ = ' + str(m - 1) + '  $c$ = ' + str(b))
 
     
 

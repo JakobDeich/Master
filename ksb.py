@@ -146,6 +146,8 @@ def calculate_ksb(path):
     # nx = table.meta['NX_TILES']
     tab2 = []
     tab3 = []
+    tab4 = []
+    tab5 = []
     logging.info('start ksb algorithm')
     count = 0
     for Galaxy in table:        
@@ -155,23 +157,28 @@ def calculate_ksb(path):
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
         sub_gal_image = gal_image[b] 
         sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
-        #sub_psf_image = psf_image[b]
         meas_on_galaxy = ksb_moments(sub_gal_image.array)
         e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
         e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
         P_g11 = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
         P_g22 = meas_on_galaxy['Psh22']-meas_on_galaxy['Psm22']/meas_on_psf['Psm22']*meas_on_psf['Psh22']
-        tab2.append((meas_on_galaxy['e1'] - e1_anisotropy_correction)/P_g11)
-        tab3.append((meas_on_galaxy['e2'] - e2_anisotropy_correction)/P_g22)
-        count = count +1 
-    Col_A = Column(name='g1_cal', data=tab2)
-    Col_B = Column(name='g2_cal', data=tab3)
+        tab2.append(P_g11)
+        tab3.append(P_g22)
+        tab4.append(meas_on_galaxy['e1'] - e1_anisotropy_correction)
+        tab5.append(meas_on_galaxy['e2'] - e2_anisotropy_correction)
+        count = count + 1 
+    Col_A = Column(name='Pg_11', data=tab2)
+    Col_B = Column(name='Pg_22', data=tab3)
+    Col_C = Column(name='e1_cal', data=tab4)
+    Col_D = Column(name='e2_cal', data=tab5)
     try:
-        table.add_columns([Col_A, Col_B])
+        table.add_columns([Col_A, Col_B, Col_C, Col_D])
         logging.info('Add columns to table')
     except:
-        table.replace_column(name = 'e1_cal', col = Col_A)
-        table.replace_column(name = 'e2_cal', col = Col_B)
+        table.replace_column(name = 'Pg_11', col = Col_A)
+        table.replace_column(name = 'Pg_22', col = Col_B)
+        table.replace_column(name = 'e1_cal', col = Col_C)
+        table.replace_column(name = 'e2_cal', col = Col_D)
         logging.info('replaced columns in table')
     table.write( path + '/Measured_ksb.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and e2_cal')
@@ -217,8 +224,8 @@ def calculate_ksb_galsim(path):
         table.add_columns([Col_A, Col_B])
         logging.info('Add columns to table')
     except:
-        table.replace_column(name = 'Shear_cal_gal', col = Col_A)
-        table.replace_column(name = 'e2_cal_galsim', col = Col_B)
+        table.replace_column(name = 'g1_cal_galsim', col = Col_A)
+        table.replace_column(name = 'g2_cal_galsim', col = Col_B)
         logging.info('replaced columns in table')
     table.write( path + '/Measured_galsim.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1 and e2')
