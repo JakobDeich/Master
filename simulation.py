@@ -13,7 +13,7 @@ from astropy.table import Table
 
 start = time.time()
 
-def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', dirname='test', gamma1 = 0, gamma2 = 0):   
+def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', dirname='test', gamma1 = 0, gamma2 = 0, psf_pol = 0):   
     mydir = config.workpath(dirname)
     # mylogpath = os.path.join(mydir, "generate_simulation.log")
     # log_format = '%(asctime)s %(filename)s: %(message)s'
@@ -22,14 +22,14 @@ def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', 
     if only_one_table == True:
         #logging.info('Simulation uses only one randomly drawn table of galaxy parameters for the generated grid')
         t = Table.read(path_table)
-        tab.generate_gamma_tab(mydir, gamma1, gamma2)
+        tab.generate_gamma_tab(mydir, gamma1, gamma2, psf_pol)
         file_name = os.path.join(mydir, '/Input_data.fits')
         t.write(file_name, overwrite = True)
         image.generate_image(mydir + '/Input_data.fits', mydir)
     else:
         #logging.info('Simulation generates a new randomly drawn table of galaxy parameters for the grid')
-        tab.generate_gamma_tab(mydir, gamma1, gamma2)
-        tab.generate_table(50,50,50,50, mydir)
+        tab.generate_gamma_tab(mydir, gamma1, gamma2, psf_pol)
+        tab.generate_table(50,50,64,64, mydir)
         image.generate_image(mydir + '/Input_data.fits', mydir)
     return None
 
@@ -44,7 +44,7 @@ def simulate_Grids(N):
     gamma1 = 0
     for i in range(N):
         gamma1 = Gammas[i]
-        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0]
+        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0, -0.05]
         final.append(params)
     with Pool() as pool:
         pool.starmap(generate_simulation, final)
@@ -69,8 +69,8 @@ def calculate_shear(N):
     with Pool() as pool:
         pool.starmap(ksb.calculate_ksb, final)
 
-simulate_Grids(20)
-calculate_shear_galsim(20)
+#simulate_Grids(20)
+# calculate_shear_galsim(20)
 calculate_shear(20)
 
 end = time.time()

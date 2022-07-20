@@ -27,11 +27,14 @@ def gal_flux(mag):
 
 def generate_psf_image(path):
     table = Table.read(path + '/Input_data.fits')
+    Gamma = Table.read(path + '/Gamma.fits')
     stamp_xsize = table.meta['STAMP_X']
     stamp_ysize = table.meta['STAMP_Y']
+    e1 = Gamma['psf_pol']
     pixel_scale_small = 0.02 
     psf_image = galsim.ImageF(stamp_xsize, stamp_ysize, scale = pixel_scale_small)
     psf = generate_psf()
+    psf = psf.shear(e1 = e1)
     psf.drawImage(psf_image)
     file_name = os.path.join(path, 'PSF.fits')
     psf_image.write(file_name)
@@ -65,7 +68,7 @@ def generate_image(path_table, path):
     #creating the grid and placing galaxies on it
     count = 0
     for Galaxy in table:
-        if count%400==0:
+        if count%1000==0:
             print(count)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile

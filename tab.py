@@ -71,9 +71,9 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     t.write( file_name , overwrite=True)  
     return None
 
-def generate_gamma_tab(path, gamma1, gamma2 = 0):
-    t = Table(names = ['gamma1', 'gamma2'])
-    t.add_row([gamma1, gamma2])
+def generate_gamma_tab(path, gamma1, gamma2 = 0, psf_pol = 0):
+    t = Table(names = ['gamma1', 'gamma2', 'psf_pol'])
+    t.add_row([gamma1, gamma2, psf_pol])
     if not os.path.isdir(path):
             os.mkdir(path)
     file_name = os.path.join(path, 'Gamma.fits')
