@@ -19,9 +19,12 @@ gamma_cal = []
 #     table = Table.read(path)
 #     e1 = table['e1_cal']
 #     e1_corr = table['anisotropy_corr']
+#     Pg11 = table['Pg_11']
 #     mean1 = np.mean(e1)
 #     mean2 = np.mean(e1_corr)
+#     mean3 = np.mean(Pg11)
 #     e1_s.append(mean1-mean2)
+#     gamma_cal.append((mean1-mean2)/mean3)
 # gamma_real = np.linspace(-0.1, 0.1, 20)
 # z = np.polyfit(gamma_real, e1_s, 1)
 # P_g = z[0]
@@ -30,22 +33,27 @@ gamma_cal = []
 # gamma_cal = e1_s/P_g
 
 gamma_real = []  
-b = 1 #0.66
+b = 0.0 #0.66
 for i in range(20):
     path = config.workpath('Test_' + str(i+1) +'/Measured_ksb.fits')
     table = Table.read(path)
     path2 = config.workpath('Test_' + str(i+1) +'/Gamma.fits')
     Gamma = Table.read(path2)
+    mag = table['mag']
+    mag_range = mag > 21
+    mag_range2 = mag < 22
+    Is_good = np.logical_and(mag_range, mag_range2)
     e1 = table['e1_cal']
     r_half = table['r_half']
     e_corr = table['anisotropy_corr']
     P_g11 = table['Pg_11']
-    P_g22 = table['Pg_22']
-    mean1 = np.mean(e_corr)
-    mean2 = np.mean((P_g22+ P_g11)/2)
-    print(mean2)
-    mean3 = np.mean(e1)
-    gamma_cal.append((mean3-mean1)/mean2)
+    #print(e_corr)
+    #print(P_g11)
+    mean1 = np.mean(e1 - (b* e_corr))
+    mean2 = np.mean(P_g11)
+    #mean3 = np.mean(e1)
+    gamma_cal.append(mean1/mean2)
+    #print(mean3-mean1, mean2)
     for Galaxy in Gamma:
         gamma_real.append(Galaxy['gamma1'])
         
@@ -70,9 +78,9 @@ for i in range(20):
 # mag = table['mag']
 # data = []
 # print(P_g, np.mean(np.abs(P_g)))
-# # mag_range = mag > 21
-# # mag_range2 = mag < 22
-# # Is_good = np.logical_and(mag_range, mag_range2)
+# mag_range = mag > 21
+# mag_range2 = mag < 22
+# Is_good = np.logical_and(mag_range, mag_range2)
 # r_half = table['r_half'] 
 # n_ser = table['n']
 # # print(np.mean(P_g[Is_good]))
@@ -121,10 +129,11 @@ for i in range(20):
 # plt.xlabel('pre-seeing shear polarizability')
 # plt.ylabel('counts')
 
-# for i in range(20):
-#     path = config.workpath('Test_' + str(i+1) +'/Measured_galsim.fits')
+# gamma_real = []
+# for i in range(1):
+#     path = config.workpath('Test_' + str(i+20) +'/Measured_galsim.fits')
 #     table = Table.read(path)
-#     path2 = config.workpath('Test_' + str(i+1) +'/Gamma.fits')
+#     path2 = config.workpath('Test_' + str(i+20) +'/Gamma.fits')
 #     Gamma = Table.read(path2)
 #     dum1 = []
 #     dum2 = []
@@ -134,15 +143,18 @@ for i in range(20):
 #             gamma1 = Galaxy['g1_cal_galsim']
 #             gamma2 = Galaxy['g2_cal_galsim']
 #             #print(gamma1)
-#             dum1.append(gamma1)
+#             e1 = Galaxy['e1_galsim']
+#             dum1.append(e1)
+#             dum2.append(gamma1)
         
-#     for Galaxy in Gamma:
-#         # gamma2 = shear._g.imag
-#         dum2.append(Galaxy['gamma1'])
+#     # for Galaxy in Gamma:
+#     #     # gamma2 = shear._g.imag
+#     #     dum2.append(Galaxy['gamma1'])
 #     mean1 = statistics.mean(dum1)
 #     gamma_cal.append(mean1)
 #     mean2 = statistics.mean(dum2)
 #     gamma_real.append(mean2)
+#     print(mean1, mean2)
 
 
 g = np.linspace(-0.1, 0.1, 250)

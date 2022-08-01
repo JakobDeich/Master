@@ -44,7 +44,7 @@ def simulate_Grids(N):
     gamma1 = 0
     for i in range(N):
         gamma1 = Gammas[i]
-        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0, -0.05]
+        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0, 0.05]
         final.append(params)
     with Pool() as pool:
         pool.starmap(generate_simulation, final)
@@ -69,8 +69,7 @@ def calculate_shear(N):
     with Pool() as pool:
         pool.starmap(ksb.calculate_ksb, final)
 
-#simulate_Grids(20)
-# calculate_shear_galsim(20)
+simulate_Grids(20)
 calculate_shear(20)
 
 end = time.time()

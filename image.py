@@ -50,11 +50,11 @@ def generate_image(path_table, path):
     Gamma = Table.read(path + '/Gamma.fits')
     gamma1 = Gamma['gamma1']
     gamma2 = Gamma['gamma2']
+    psf_pol = Gamma['psf_pol']
     ny_tiles = table.meta['NY_TILES']
     nx_tiles = table.meta['NX_TILES']
     stamp_xsize = table.meta['STAMP_X']
     stamp_ysize = table.meta['STAMP_Y']
-    N = table.meta['N']
     pixel_scale = 0.1 #arcsec/pixel
     t_exp = 3*565 #s
     gain = 3.1 #e/ADU
@@ -63,8 +63,9 @@ def generate_image(path_table, path):
     l_pix = 0.1 #arcsec
     sky_flux = l_pix**2*t_exp/gain*10**(-0.4*(mag_sky-Z_p))
     gal_image = galsim.ImageF((stamp_xsize * nx_tiles-1)*2+1, stamp_ysize * ny_tiles-1, scale = pixel_scale)
-    #define optical psf with Euclid condition 
+    #define optical psf with Euclid condition and anisotropy
     psf = generate_psf()
+    psf = psf.shear(e1 = psf_pol)
     #creating the grid and placing galaxies on it
     count = 0
     for Galaxy in table:
@@ -76,18 +77,19 @@ def generate_image(path_table, path):
         gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
         gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
         #create grid
-        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_top'], Galaxy['bound_y_bottom'])
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
         sub_gal_image = gal_image[b] 
         ud = galsim.UniformDeviate(random_seed + count + 1)
         dx = (2*ud()-1) * pixel_scale/2
         dy = (2*ud()-1) * pixel_scale/2
         #shift galaxies and psfs on the grid
         gal = gal.shift(dx, dy)
-        #convolve galaxy and psf                          
-        final_gal = galsim.Convolve([psf,gal], gsparams = gs)
         if (Galaxy['rotation'] == 1):
-            final_gal = final_gal.rotate(galsim.Angle(theta = 90, unit = coord.degrees))
-        final_gal = final_gal.shear(g1 = gamma1, g2 = gamma2)
+            gal = gal.rotate(galsim.Angle(theta = 90, unit = coord.degrees))
+        #shear galaxy
+        gal = gal.shear(g1 = gamma1, g2 = gamma2)
+        #convolve galaxy and psf 
+        final_gal = galsim.Convolve([psf,gal], gsparams = gs)
         try:
             final_gal.drawImage(sub_gal_image)
         except:

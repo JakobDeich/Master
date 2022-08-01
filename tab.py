@@ -24,9 +24,6 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     logging.info('Start')
     logging.info('downloaded GEMS catalog')
     tab = np.zeros((14046,3))
-    GammaTable = Table.read('/vol/aibn1053/data1/jdeich/work_master/Gamma.fits')
-    gamma1 = GammaTable.meta['GAMMA1']
-    gamma2 = GammaTable.meta['GAMMA2']
     #print(cat.get(14659,'ST_MAG_GALFIT'))
     count = 0
     N = ny_tiles*nx_tiles
@@ -41,7 +38,7 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     logging.info('filtered GEMS catalog with cuts')
     rng = np.random.default_rng()
     tab_random = rng.choice(tab, size = N)
-    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_top', 'bound_y_bottom', 'rotation'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'i4'], meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'N': N})
+    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top', 'rotation'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'i4'], meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'N': N})
     i = 0
     for iy in range(ny_tiles):
         for ix in range(nx_tiles):
