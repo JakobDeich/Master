@@ -13,6 +13,9 @@ import tab
 import config
 import image
 from astropy.table import Table, Column
+from photutils.aperture import CircularAperture
+from photutils.aperture import aperture_photometry
+from photutils.morphology import data_properties
 
 # table = tab.generate_table()
 # #image.generate_image()
@@ -139,19 +142,25 @@ def calculate_ksb(path):
     meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
-    # table = Table.read(path + '/table.fits')
     table = Table.read(path + '/Input_data.fits')
     logging.info('Read in table from %s /table.fits' %path)
     image_file = path + '/Grid.fits'
     gal_image = galsim.fits.read(image_file)
-    # ny = table.meta['NY_TILES']
-    # nx = table.meta['NX_TILES']
+    stamp_x_size = table.meta['STAMP_X']
+    stamp_y_size = table.meta['STAMP_Y']
+    tab = []
     tab2 = []
     tab3 = []
     tab4 = []
-    #tab5 = []
+    tab5 = []
+    tab6 = []
+    tab7 = []
+    tab8 = []
     logging.info('start ksb algorithm')
     count = 0
+    positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
+    aperture = CircularAperture(positions, r=sigw_sub)
+    aperture2 =  CircularAperture(positions, r=sigw_sub*1.5)
     for Galaxy in table:        
         if count%1000==0:
             logging.warning('Galaxy number %i' %count)
@@ -164,20 +173,46 @@ def calculate_ksb(path):
         #e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
         P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
         #P_g22 = meas_on_galaxy['Psh22']-meas_on_galaxy['Psm22']/meas_on_psf['Psm22']*meas_on_psf['Psh22']
+        phot_table = aperture_photometry(sub_gal_image.array, aperture)
+        phot_table2 = aperture_photometry(sub_gal_image.array, aperture2)
+        cat = data_properties(sub_gal_image.array)
+        columns = ['label', 'xcentroid', 'ycentroid', 'semimajor_sigma','semiminor_sigma', 'orientation']
+        tbl = cat.to_table(columns=columns)
+        a = tbl['semimajor_sigma'] 
+        b = tbl['semiminor_sigma'] 
+        Radius = np.sqrt( a * b )
+        tab.append(Radius)
         tab2.append(P_g11)
         tab3.append(e1_anisotropy_correction)
         tab4.append(meas_on_galaxy['e1'])
+        tab5.append(phot_table['aperture_sum'])
+        if phot_table['aperture_sum'] > 600:
+            tab6.append(0)
+        else:
+            tab6.append(1)
+        tab7.append(tbl['xcentroid'])
+        tab8.append(tbl['ycentroid'])
         count = count + 1 
-    Col_A = Column(name='Pg_11', data=tab2)
-    Col_B = Column(name='anisotropy_corr', data=tab3)
-    Col_C = Column(name='e1_cal', data=tab4)
+    Col_A = Column(name = 'Pg_11', data = tab2)
+    Col_B = Column(name = 'anisotropy_corr', data = tab3)
+    Col_C = Column(name = 'e1_cal', data = tab4)
+    Col_D = Column(name = 'aperture_sum', data = tab5)
+    Col_E = Column(name = 'radius_est', data = tab)
+    Col_F = Column(name = 'Flag', data = tab6)
+    Col_G = Column(name = 'x_centroid', data = tab7)
+    Col_H = Column(name = 'y_centroid', data = tab8)
     try:
-        table.add_columns([Col_A, Col_B, Col_C])
+        table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H])
         logging.info('Add columns to table')
     except:
         table.replace_column(name = 'Pg_11', col = Col_A)
         table.replace_column(name = 'anisotropy_corr', col = Col_B)
         table.replace_column(name = 'e1_cal', col = Col_C)
+        table.replace_column(name = 'aperture_sum', col = Col_D)
+        table.replace_column(name = 'radius_est', col = Col_E)
+        table.replace_column(name = 'Flag', col = Col_F)
+        table.replace_column(name = 'x_centroid', col = Col_G)
+        table.replace_column(name = 'y_centroid', col = Col_H)
         logging.info('replaced columns in table')
     table.write( path + '/Measured_ksb.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
@@ -195,7 +230,7 @@ def calculate_ksb_galsim(path):
     gal_image = galsim.fits.read(image_file)
     # ny = table.meta['NY_TILES']
     # nx = table.meta['NX_TILES']
-    tab = []
+    tab5 = []
     tab2 = []
     tab3 = []
     tab4 = []
@@ -210,14 +245,15 @@ def calculate_ksb_galsim(path):
         sub_gal_image = gal_image[b] 
         sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
         try:
-            results = galsim.hsm.EstimateShear(sub_gal_image, PSF)
-            tab.append(results.corrected_e1)
+            results = galsim.hsm.EstimateShear(sub_gal_image, PSF, guess_sig_PSF = 10, guess_sig_gal = 10)
+            tab5.append(results.corrected_e1)
             tab2.append(results.observed_shape._g.real)
             tab3.append(results.observed_shape._g.imag)
             tab4.append(0)
+            
         except:
             n_fail += 1
-            tab.append(-10)
+            tab5.append(-10)
             tab2.append(-10)
             tab3.append(-10)
             tab4.append(1)
@@ -239,7 +275,7 @@ def calculate_ksb_galsim(path):
     table.write( path + '/Measured_galsim.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1 and e2')
     return None
-# mydir = config.workpath('Test_20')
+# mydir = config.workpath('Test_1')
 # calculate_ksb_galsim(mydir)
 
 

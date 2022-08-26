@@ -28,8 +28,9 @@ def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', 
         image.generate_image(mydir + '/Input_data.fits', mydir)
     else:
         #logging.info('Simulation generates a new randomly drawn table of galaxy parameters for the grid')
+        os.makedirs(mydir, exist_ok=True)
         tab.generate_gamma_tab(mydir, gamma1, gamma2, psf_pol)
-        tab.generate_table(50,50,64,64, mydir)
+        tab.generate_table(75,75,64,64, mydir)
         image.generate_image(mydir + '/Input_data.fits', mydir)
     return None
 
@@ -37,14 +38,14 @@ def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', 
 #generate_simulation(True, 'Test/table.fits', 'output1')
 #image.generate_psf_image('Test/table.fits')
 
-def simulate_Grids(N):
-    runname = "Test"
+def simulate_Grids(N, name, psf_pol):
+    runname = name
     final = []
     Gammas = np.linspace(-0.1, 0.1, N)
     gamma1 = 0
     for i in range(N):
         gamma1 = Gammas[i]
-        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0, 0.05]
+        params = [False,'Test/Input_data.fits' ,runname + "_" + str(i+1), gamma1, 0, psf_pol]
         final.append(params)
     with Pool() as pool:
         pool.starmap(generate_simulation, final)
@@ -60,8 +61,8 @@ def calculate_shear_galsim(N):
         pool.starmap(ksb.calculate_ksb_galsim, final)
 
 
-def calculate_shear(N):
-    runname = 'Test'
+def calculate_shear(N, runname):
+    runname = runname
     final = []
     for i in range(N):
         params = [config.workpath(runname + '_' + str(i+1))]
@@ -69,8 +70,8 @@ def calculate_shear(N):
     with Pool() as pool:
         pool.starmap(ksb.calculate_ksb, final)
 
-simulate_Grids(20)
-calculate_shear(20)
+simulate_Grids(20, 'Run6/PSF_es', 0.1)
+calculate_shear(20, 'Run6/PSF_es')  
 
 end = time.time()
 total_time = (end - start)/(60*60)  #run time in hours
