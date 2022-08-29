@@ -481,7 +481,6 @@ for i in range(20):
     xc = table['x_centroid']
     yc = table['y_centroid']
     Aper_sum = table['aperture_sum'] 
-    # print(Aper_sum[Is_good[0]])
     t = Table(names = ['e1_cal', 'anisotropy_corr' ,'Pg_11', 'number', 'Flag'])
     for Galaxy in table:
         if Galaxy['rotation'] == 0:
@@ -491,24 +490,29 @@ for i in range(20):
     for i in range(100):
         if i%25==0:
             print(i)
-        Chosen_gals = Table(names = ['e1_cal', 'anisotropy_corr', 'Pg_11', 'number', 'Flag'], dtype = ['f4', 'f4', 'f4', 'i4', 'i4'])
         rng = np.random.default_rng()
-        t_random = rng.choice(t, size = (table.meta['NY_TILES'] * table.meta['NX_TILES']))
-        for Galaxy in t_random:
-            params = [table['e1_cal'][2*int(Galaxy['number'])-1], table['anisotropy_corr'][2*int(Galaxy['number'])-1], table['Pg_11'][2*int(Galaxy['number'])-1], table['number'][2*int(Galaxy['number'])-1], table['Flag'][2*int(Galaxy['number'])-1]]
-            params2 = [table['e1_cal'][2*int(Galaxy['number'])-2], table['anisotropy_corr'][2*int(Galaxy['number'])-2], table['Pg_11'][2*int(Galaxy['number'])-2], table['number'][2*int(Galaxy['number'])-2], table['Flag'][2*int(Galaxy['number'])-2]]
-            Chosen_gals.add_row(params2)
-            Chosen_gals.add_row(params)
-        Flags = Chosen_gals['Flag']
+        numb_random = rng.choice(range(table.meta['NY_TILES'] * table.meta['NX_TILES']), size = (table.meta['NY_TILES'] * table.meta['NX_TILES']))
+        e1_err = table['e1_cal'][2*numb_random-2]
+        e1_err2 = table['e1_cal'][2*numb_random-1]
+        anis_err = table['anisotropy_corr'][2*numb_random-2]
+        anis_err2 = table['anisotropy_corr'][2*numb_random-1]
+        Pg_err2 = table['Pg_11'][2*numb_random-2]
+        Pg_err = table['Pg_11'][2*numb_random-1]
+        Flags = table['Flag'][2*numb_random-2]
+        Flags2 = table['Flag'][2*numb_random-1]   
         Is_good = Flags == 0
-        e1_err = Chosen_gals['e1_cal']
-        anis_err = Chosen_gals['anisotropy_corr']
-        Pg_err = Chosen_gals['Pg_11']
-        pol_err = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
-        Pg_err = np.mean(Pg_err[Is_good])
+        Is_good2 = Flags2 == 0
+        pol_err1 = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
+        pol_err2 = np.mean(e1_err2[Is_good2] - b* anis_err2[Is_good2])
+        pol_err = (pol_err1 + pol_err2)/2 
+        Pg_err1 = np.mean(Pg_err[Is_good])
+        Pg_err2 = np.mean(Pg_err2[Is_good2])
+        Pg_err = (Pg_err1 + Pg_err2)/2 
         gamma_errs.append(pol_err/Pg_err)
     Errors.append(np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2)))
     print(Errors)
+    Flag = table['Flag']
+    Is_good = Flag == 0
     polarisation = np.mean(e1[Is_good]-b*e_corr[Is_good])
     Pg = np.mean(P_g11[Is_good])
     #mean3 = np.mean(e1)
@@ -518,13 +522,18 @@ for i in range(20):
         gamma_real.append(Galaxy['gamma1'])
 ErrorsTable = Table([Errors], names = ['Error'], dtype = ['f4'])
 file_name = config.workpath('Run6/Errors.fits')
-ErrorsTable.write( file_name , overwrite=True)  
-popt, pcov = curve_fit(linear, gamma_real, (gamma_cal-gamma_real), sigma = Errors, absolute_sigma = True)
+ErrorsTable.write( file_name , overwrite=True) 
+gamma_dif = [] 
+for i in range(20):
+    gamma_dif.append(gamma_cal[i] - gamma_real[i])
+end = time.time()
+
+popt, pcov = curve_fit(linear, gamma_real, gamma_dif, sigma = Errors, absolute_sigma = True)
 
 g = np.linspace(-0.1, 0.1, 250)
-plt.errorbar(gamma_real, (gamma_cal-gamma_real), yerr = Errors, ecolor = 'red', fmt = 'r.')
+plt.errorbar(gamma_real, gamma_dif, yerr = Errors, ecolor = 'red', fmt = 'r.')
 
-z = np.polyfit(gamma_real, gamma_cal, 1)
+z = np.polyfit(gamma_real, gamma_dif, 1)
 m = z[0]
 b = z[1]
 plt.plot(g, linear(g, m, b))
@@ -533,8 +542,29 @@ plt.ylabel('$g_{output} - g_{input}$')
 plt.title('$\mu$ = ' + str(round((m),6)) + '$\pm$ ' + str(round(pcov[0,0],6)) + '  $c$ = ' + str(round(b,6)) + '$\pm$ ' + str(round(pcov[1,1],8)))
 plt.savefig('Plots2/Bootstrapping_Gamma.pdf')
 
-
-end = time.time()
+# b = 1
+# gamma_cal = []
+# gamma_real = []
+# for i in range(20):
+#     path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+#     table = Table.read(path)
+#     path2 = config.workpath('Run6/PSF_es_' + str(i+1) +'/Gamma.fits')
+#     Gamma = Table.read(path2)
+#     e1 = table['e1_cal']
+#     e_corr = table['anisotropy_corr']
+#     P_g11 = table['Pg_11']
+#     Aper_sum = table['aperture_sum'] 
+#     Is_good = Aper_sum > 600
+#     Is_good = Is_good.T
+#     polarisation = np.mean(e1[Is_good[0]]-b*e_corr[Is_good[0]])
+#     Pg = np.mean(P_g11[Is_good[0]])
+#     #mean3 = np.mean(e1)
+#     gamma_cal.append(polarisation/Pg)
+#     #print(mean3-mean1, mean2)
+#     for Galaxy in Gamma:
+#         gamma_real.append(Galaxy['gamma1'])
+# path3 = config.workpath('Run6/Errors.fits')
+# Errors = Table.read(path3)
 total_time = (end - start)/(60*60)  #run time in hours
 print('The system took ', total_time ,' hours to execute the function')    
     
