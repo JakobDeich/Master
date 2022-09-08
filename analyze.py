@@ -15,6 +15,51 @@ start = time.time()
 def linear(x, m, b):
     return m*x + b
 
+def Bootstrap(table, b, flag = True):
+    Error = 0
+    gamma_errs = []
+    if flag == True:
+        for i in range(200):
+            # if i%25==0:
+            #     print(i)
+            rng = np.random.default_rng()
+            numb_random = rng.choice(range(table.meta['NY_TILES'] * table.meta['NX_TILES']), size = (table.meta['NY_TILES'] * table.meta['NX_TILES']))
+            e1_err1 = table['e1_cal'][2*numb_random-2]
+            e1_err2 = table['e1_cal'][2*numb_random-1]
+            e1_err = np.concatenate((e1_err1, e1_err2))
+            anis_err1 = table['anisotropy_corr'][2*numb_random-2]
+            anis_err2 = table['anisotropy_corr'][2*numb_random-1]
+            anis_err = np.concatenate((anis_err1, anis_err2))
+            Pg_err2 = table['Pg_11'][2*numb_random-2]
+            Pg_err1 = table['Pg_11'][2*numb_random-1]
+            Pg_err = np.concatenate((Pg_err1, Pg_err2))
+            Flags1 = table['Flag'][2*numb_random-2]
+            Flags2 = table['Flag'][2*numb_random-1]  
+            Flags = np.concatenate((Flags1, Flags2))
+            Is_good = Flags == 0
+            pol_err = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
+            Pg_err = np.mean(Pg_err[Is_good])
+            gamma_errs.append(pol_err/Pg_err)
+        Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))
+    else:
+        for i in range(200):
+            rng = np.random.default_rng()
+            numb_random = rng.choice(range(table.meta['NY_TILES'] * table.meta['NX_TILES']), size = (table.meta['NY_TILES'] * table.meta['NX_TILES']))
+            e1_err1 = table['e1_cal'][2*numb_random-2]
+            e1_err2 = table['e1_cal'][2*numb_random-1]
+            e1_err = np.concatenate((e1_err1, e1_err2))
+            anis_err1 = table['anisotropy_corr'][2*numb_random-2]
+            anis_err2 = table['anisotropy_corr'][2*numb_random-1]
+            anis_err = np.concatenate((anis_err1, anis_err2))
+            Pg_err2 = table['Pg_11'][2*numb_random-2]
+            Pg_err1 = table['Pg_11'][2*numb_random-1]
+            Pg_err = np.concatenate((Pg_err1, Pg_err2))
+            pol_err = np.mean(e1_err - b* anis_err)
+            Pg_err = np.mean(Pg_err)
+            gamma_errs.append(pol_err/Pg_err)
+        Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))  
+    return Error
+
 e1_s = []
 
 #smear polarizability in dependence on magnitude
@@ -249,48 +294,45 @@ e1_s = []
 
 #b = 1#0.66
 
-# bsm = np.linspace(1,1.4,8)
-# bs_real = []
-# e_psfs = np.linspace(0,0.1,6)
-# for j in range(6):
-#     cs = []
-#     for b in bsm:
-#         gamma_cal = []
-#         gamma_real = []
-#         for i in range(20):
-#             path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
-#             table = Table.read(path)
-#             path2 = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Gamma.fits')
-#             Gamma = Table.read(path2)
-#             e1 = table['e1_cal']
-#             e_corr = table['anisotropy_corr']
-#             P_g11 = table['Pg_11']
-#             #print(e_corr)
-#             #print(P_g11)
-#             mean1 = np.mean(e1-b*e_corr)
-#             mean2 = np.mean(P_g11)
-#             #mean3 = np.mean(e1)
-#             gamma_cal.append(mean1/mean2)
-#             #print(mean3-mean1, mean2)
-#             for Galaxy in Gamma:
-#                 gamma_real.append(Galaxy['gamma1'])
-#         z = np.polyfit(gamma_real, gamma_cal, 1)
-#         m = z[0]
-#         b = z[1]
-#         cs.append(b) 
-#     css = np.polyfit(bsm, cs,1)
-#     bsm2 = np.linspace(1,1.4,200)
-#     m2 = css[0]
-#     b2 = css[1]
-#     bs = []
-#     for i in bsm2:
-#         if abs(linear(i, m2, b2)) < 10**(-5):
-#             bs.append(i)
-#     bs_real.append(np.median(bs))
+bsm = np.linspace(1.1,1.4,3)
+gamma_real = np.linspace(-0.1, 0.1, 20)
+bs_err = []
+bs_real = []
+e_psfs = np.linspace(0,0.1,6)
+for j in range(6):
+    cs = []
+    cs_err = []
+    for b in bsm:
+        gamma_cal = []
+        Errors = []
+        for i in range(20):
+            path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+            table = Table.read(path)
+            e1 = table['e1_cal']
+            e_corr = table['anisotropy_corr']
+            P_g11 = table['Pg_11']
+            Flags = table['Flag']
+            Is_good = Flags == 0
+            mean1 = np.mean(e1[Is_good]-b*e_corr[Is_good])
+            mean2 = np.mean(P_g11[Is_good])
+            gamma_cal.append(mean1/mean2)
+            Errors.append(Bootstrap(table, b, True))
+        popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
+        m = popt[0]
+        bias = popt[1]
+        cs.append(bias) 
+        cs_err.append(pcov[1,1])
+    popt, pcov = curve_fit(linear, bsm, cs, sigma = cs_err, absolute_sigma = True)
+    m2 = popt[0]
+    b2 = popt[1]
+    bs_real.append(-1*b2/m2)
+    bs_err.append(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))
+    print('boost factor determined with' + str(-1*b2/m2) + ' and ' + str(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2)))
     
-# plt.plot(e_psfs, bs_real, 'ro')
-# plt.xlabel('$e_1^{PSF}$')
-# plt.ylabel('$b^{sm}_1$')
+plt.errorbar(e_psfs, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'ro')
+plt.xlabel('$e_1^{PSF}$')
+plt.ylabel('$b^{sm}_1$')
+plt.savefig('Plots2/bsm_e_psf2.pdf')
 
 # gamma_real = np.linspace(-0.1,0.1,20)
 # gamma_cal = []
@@ -305,51 +347,58 @@ e1_s = []
 
 # b = 1
 # cs_corr = []
+# cs_corr2 = []
 # cs_uncorr = []
 # e_psfs = np.linspace(0,0.1,6)
+# gamma_real = np.linspace(-0.1,0.1,20)
 # for j in range(6):
-#     gamma_real = []
 #     gamma_cal = []
+#     Errors = []
 #     for i in range(20):
 #         path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
 #         table = Table.read(path)
-#         path2 = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Gamma.fits')
-#         Gamma = Table.read(path2)
 #         e1 = table['e1_cal']
 #         e_corr = table['anisotropy_corr']
 #         P_g11 = table['Pg_11']
 #         mean1 = np.mean(e1-b*e_corr)
 #         mean2 = np.mean(P_g11)
-#         #mean3 = np.mean(e1)
-#         gamma_cal.append(mean1/mean2)
-#         #print(mean3-mean1, mean2)
-#         for Galaxy in Gamma:
-#             gamma_real.append(Galaxy['gamma1'])
-#     z = np.polyfit(gamma_real, gamma_cal, 1)
-#     cs_corr.append(z[1])
-# print(cs_corr)
+#         gamma_cal.append(mean1/mean2 - gamma_real[i])
+#         Errors.append(Bootstrap(table, b))
+#     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
+#     cs_corr.append(popt[1])
+#     print('corrected bias finished')
 # for j in range(6):
-#     gamma_real = []
 #     gamma_cal = []
+#     Errors = []
 #     for i in range(20):
 #         path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
 #         table = Table.read(path)
-#         path2 = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Gamma.fits')
-#         Gamma = Table.read(path2)
+#         e1 = table['e1_cal']
+#         e_corr = table['anisotropy_corr']
+#         P_g11 = table['Pg_11']
+#         mean1 = np.mean(e1-1.2*e_corr)
+#         mean2 = np.mean(P_g11)
+#         gamma_cal.append(mean1/mean2 - gamma_real[i])
+#         Errors.append(Bootstrap(table, b))
+#     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
+#     cs_corr2.append(popt[1])
+#     print('corrected bias2 finished with ' + str(popt[1]))
+# for j in range(6):
+#     gamma_cal = []
+#     Errors = []
+#     for i in range(20):
+#         path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+#         table = Table.read(path)
 #         e1 = table['e1_cal']
 #         P_g11 = table['Pg_11']
 #         mean1 = np.mean(e1)
 #         mean2 = np.mean(P_g11)
-#         #mean3 = np.mean(e1)
-#         gamma_cal.append(mean1/mean2)
-#         #print(mean3-mean1, mean2)
-#         for Galaxy in Gamma:
-#             gamma_real.append(Galaxy['gamma1'])
-#         g = np.linspace(-0.1, 0.1, 250)
-#     z = np.polyfit(gamma_real, gamma_cal, 1)
-#     cs_uncorr.append(z[1])
-# print(cs_uncorr)
+#         gamma_cal.append(mean1/mean2 - gamma_real[i])
+#         Errors.append(Bootstrap(table, 0))
+#     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
+#     cs_uncorr.append(popt[1])
 # plt.plot(e_psfs, cs_corr, 'ro', label = 'KSB')
+# plt.plot(e_psfs, cs_corr2, 'go', label = 'KSB with higher bsm')
 # plt.plot(e_psfs, cs_uncorr,color = 'orange', marker = 'o', linestyle = '', label = 'uncorrected')
 # plt.xlabel('$e_1^{PSF}$')
 # plt.ylabel('$c_1$')
@@ -422,125 +471,87 @@ e1_s = []
 # for i in range(1,2):
 #     path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
 #     table = Table.read(path)
+#     n_sersic = table['n']
 #     mag = table['mag']
 #     rhalf = table['r_half']
 #     R = table['radius_est']*0.02*np.sqrt(2*np.log(2))
 #     Aper_sum = table['aperture_sum'] 
 #     Mag_estimate = 24.6 - 2.5 * np.log10(3.1/(3*565)* Aper_sum)
 #     # plt.plot(mag, Mag_estimate, '.')
-#     plt.plot(rhalf, R, '.')
+#     plt.scatter(rhalf, R, c = n_sersic, marker = '.', cmap = 'viridis')
 #     plt.xlabel('GEMS half light radius in arcsec')
 #     plt.ylabel('half light radius estimate in arcsec')
+#     plt.colorbar()
+#     plt.savefig('Plots2/r-half_r_half.pdf')
 #     # plt.xlabel('GEMS magnitude')
 #     # plt.ylabel('magnite estimate')
 
-def Bootstrap(sample):
-    Error = 0
-    t = Table(names = ['e1_cal', 'anisotropy_corr' ,'Pg_11', 'number', 'Flag'])
-    for Galaxy in sample:
-        if Galaxy['rotation'] == 0:
-            params = [Galaxy['e1_cal'], Galaxy['anisotropy_corr'], Galaxy['Pg_11'], Galaxy['number'], Galaxy['Flag']]
-            t.add_row(params)
-    gamma_errs = []
-    for i in range(100):
-        if i%25==0:
-            print(i)
-        Chosen_gals = Table(names = ['e1_cal', 'anisotropy_corr', 'Pg_11', 'number', 'Flag'], dtype = ['f4', 'f4', 'f4', 'i4', 'i4'])
-        rng = np.random.default_rng()
-        t_random = rng.choice(t, size = len(sample))
-        for Galaxy in t_random:
-            params = [sample['e1_cal'][2*int(Galaxy['number'])-1], sample['anisotropy_corr'][2*int(Galaxy['number'])-1], sample['Pg_11'][2*int(Galaxy['number'])-1], sample['number'][2*int(Galaxy['number'])-1], sample['Flag'][2*int(Galaxy['number'])-1]]
-            params2 = [sample['e1_cal'][2*int(Galaxy['number'])-2], sample['anisotropy_corr'][2*int(Galaxy['number'])-2], sample['Pg_11'][2*int(Galaxy['number'])-2], sample['number'][2*int(Galaxy['number'])-2], sample['Flag'][2*int(Galaxy['number'])-2]]
-            Chosen_gals.add_row(params2)
-            Chosen_gals.add_row(params)
-        Flags = Chosen_gals['Flag']
-        Is_good = Flags == 0
-        e1_err = Chosen_gals['e1_cal']
-        anis_err = Chosen_gals['anisotropy_corr']
-        Pg_err = Chosen_gals['Pg_11']
-        pol_err = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
-        Pg_err = np.mean(Pg_err[Is_good])
-        gamma_errs.append(pol_err/Pg_err)
-    Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))
-    return Error
 
-gamma_real = []
-gamma_cal = []
-Errors = []
-b = 1
-for i in range(20):
-    path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
-    table = Table.read(path)
-    path2 = config.workpath('Run6/PSF_es_' + str(i+1) +'/Gamma.fits')
-    Gamma = Table.read(path2)
-    e1 = table['e1_cal']
-    e_corr = table['anisotropy_corr']
-    P_g11 = table['Pg_11']
-    R = table['radius_est']*0.02 #in arcsec
-    R_half = table['r_half']
-    xc = table['x_centroid']
-    yc = table['y_centroid']
-    Aper_sum = table['aperture_sum'] 
-    t = Table(names = ['e1_cal', 'anisotropy_corr' ,'Pg_11', 'number', 'Flag'])
-    for Galaxy in table:
-        if Galaxy['rotation'] == 0:
-            params = [Galaxy['e1_cal'], Galaxy['anisotropy_corr'], Galaxy['Pg_11'], Galaxy['number'], Galaxy['Flag']]
-            t.add_row(params)
-    gamma_errs = []
-    for i in range(100):
-        if i%25==0:
-            print(i)
-        rng = np.random.default_rng()
-        numb_random = rng.choice(range(table.meta['NY_TILES'] * table.meta['NX_TILES']), size = (table.meta['NY_TILES'] * table.meta['NX_TILES']))
-        e1_err = table['e1_cal'][2*numb_random-2]
-        e1_err2 = table['e1_cal'][2*numb_random-1]
-        anis_err = table['anisotropy_corr'][2*numb_random-2]
-        anis_err2 = table['anisotropy_corr'][2*numb_random-1]
-        Pg_err2 = table['Pg_11'][2*numb_random-2]
-        Pg_err = table['Pg_11'][2*numb_random-1]
-        Flags = table['Flag'][2*numb_random-2]
-        Flags2 = table['Flag'][2*numb_random-1]   
-        Is_good = Flags == 0
-        Is_good2 = Flags2 == 0
-        pol_err1 = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
-        pol_err2 = np.mean(e1_err2[Is_good2] - b* anis_err2[Is_good2])
-        pol_err = (pol_err1 + pol_err2)/2 
-        Pg_err1 = np.mean(Pg_err[Is_good])
-        Pg_err2 = np.mean(Pg_err2[Is_good2])
-        Pg_err = (Pg_err1 + Pg_err2)/2 
-        gamma_errs.append(pol_err/Pg_err)
-    Errors.append(np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2)))
-    print(Errors)
-    Flag = table['Flag']
-    Is_good = Flag == 0
-    polarisation = np.mean(e1[Is_good]-b*e_corr[Is_good])
-    Pg = np.mean(P_g11[Is_good])
-    #mean3 = np.mean(e1)
-    gamma_cal.append(polarisation/Pg)
-    #print(mean3-mean1, mean2)
-    for Galaxy in Gamma:
-        gamma_real.append(Galaxy['gamma1'])
-ErrorsTable = Table([Errors], names = ['Error'], dtype = ['f4'])
-file_name = config.workpath('Run6/Errors.fits')
-ErrorsTable.write( file_name , overwrite=True) 
-gamma_dif = [] 
-for i in range(20):
-    gamma_dif.append(gamma_cal[i] - gamma_real[i])
-end = time.time()
+# gamma_real = []
+# gamma_cal = []
+# Errors = []
+# b = 1.25
+# for i in range(20):
+#     path = config.workpath('Run2/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+#     table = Table.read(path)
+#     path2 = config.workpath('Run6/PSF_es_' + str(i+1) +'/Gamma.fits')
+#     Gamma = Table.read(path2)
+#     e1 = table['e1_cal']
+#     e_corr = table['anisotropy_corr']
+#     P_g11 = table['Pg_11']
+#     R = table['radius_est']*0.02 #in arcsec
+#     R_half = table['r_half']
+#     xc = table['x_centroid']
+#     yc = table['y_centroid']
+#     Aper_sum = table['aperture_sum'] 
+#     gamma_errs = []
+#     for i in range(100):
+#         rng = np.random.default_rng()
+#         numb_random = rng.choice(range(table.meta['NY_TILES'] * table.meta['NX_TILES']), size = (table.meta['NY_TILES'] * table.meta['NX_TILES']))
+#         e1_err1 = table['e1_cal'][2*numb_random-2]
+#         e1_err2 = table['e1_cal'][2*numb_random-1]
+#         e1_err = np.concatenate((e1_err1, e1_err2))
+#         anis_err1 = table['anisotropy_corr'][2*numb_random-2]
+#         anis_err2 = table['anisotropy_corr'][2*numb_random-1]
+#         anis_err = np.concatenate((anis_err1, anis_err2))
+#         Pg_err2 = table['Pg_11'][2*numb_random-2]
+#         Pg_err1 = table['Pg_11'][2*numb_random-1]
+#         Pg_err = np.concatenate((Pg_err1, Pg_err2))
+#         Flags1 = table['Flag'][2*numb_random-2]
+#         Flags2 = table['Flag'][2*numb_random-1]  
+#         Flags = np.concatenate((Flags1, Flags2))
+#         Is_good = Flags == 0
+#         pol_err = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
+#         Pg_err = np.mean(Pg_err[Is_good])
+#         gamma_errs.append(pol_err/Pg_err)
+#     Errors.append(np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2)))
+#     Flag = table['Flag']
+#     Is_good = Flag == 0
+#     polarisation = np.mean(e1-b*e_corr)
+#     Pg = np.mean(P_g11)
+#     #mean3 = np.mean(e1)
+#     gamma_cal.append(polarisation/Pg)
+#     #print(mean3-mean1, mean2)
+#     for Galaxy in Gamma:
+#         gamma_real.append(Galaxy['gamma1'])
+# gamma_dif = [] 
+# for i in range(20):
+#     gamma_dif.append(gamma_cal[i] - gamma_real[i])
 
-popt, pcov = curve_fit(linear, gamma_real, gamma_dif, sigma = Errors, absolute_sigma = True)
 
-g = np.linspace(-0.1, 0.1, 250)
-plt.errorbar(gamma_real, gamma_dif, yerr = Errors, ecolor = 'red', fmt = 'r.')
+# popt, pcov = curve_fit(linear, gamma_real, gamma_dif, sigma = Errors, absolute_sigma = True)
 
-z = np.polyfit(gamma_real, gamma_dif, 1)
-m = z[0]
-b = z[1]
-plt.plot(g, linear(g, m, b))
-plt.xlabel('$g_{input}$')
-plt.ylabel('$g_{output} - g_{input}$')
-plt.title('$\mu$ = ' + str(round((m),6)) + '$\pm$ ' + str(round(pcov[0,0],6)) + '  $c$ = ' + str(round(b,6)) + '$\pm$ ' + str(round(pcov[1,1],8)))
-plt.savefig('Plots2/Bootstrapping_Gamma.pdf')
+# g = np.linspace(-0.1, 0.1, 250)
+# plt.errorbar(gamma_real, gamma_dif, yerr = Errors, ecolor = 'red', fmt = 'r.')
+
+# z = np.polyfit(gamma_real, gamma_dif, 1)
+# m = z[0]
+# b = z[1]
+# plt.plot(g, linear(g, m, b))
+# plt.xlabel('$g_{input}$')
+# plt.ylabel('$g_{output} - g_{input}$')
+# plt.title('$\mu$ = ' + str(round((m),6)) + '$\pm$ ' + str(round(pcov[0,0],6)) + '  $c$ = ' + str(round(b,6)) + '$\pm$ ' + str(round(pcov[1,1],8)))
+# # plt.savefig('Plots2/Bootstrapping_Gamma.pdf')
 
 # b = 1
 # gamma_cal = []
@@ -565,6 +576,7 @@ plt.savefig('Plots2/Bootstrapping_Gamma.pdf')
 #         gamma_real.append(Galaxy['gamma1'])
 # path3 = config.workpath('Run6/Errors.fits')
 # Errors = Table.read(path3)
-total_time = (end - start)/(60*60)  #run time in hours
-print('The system took ', total_time ,' hours to execute the function')    
+end = time.time()
+total_time = (end - start)/(60)  #run time in hours
+print('The system took ', total_time ,' minutes to execute the function')    
     
