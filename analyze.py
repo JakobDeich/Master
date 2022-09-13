@@ -60,6 +60,64 @@ def Bootstrap(table, b, flag = True):
         Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))  
     return Error
 
+def boostFactorDep(Var, Var_name, N):
+    path = config.workpath('Run6/PSF_es_1/Measured_ksb.fits')
+    table = Table.read(path)
+    Vars1 = table[Var]
+    min_var = min(Vars1)
+    max_var = max(Vars1)
+    step = (max_var-min_var)/N
+    Var_plot = []
+    bsm = np.linspace(1.1,1.4,3)
+    gamma_real = np.linspace(-0.1, 0.1, 20)
+    bs_err = []
+    bs_real = []
+    for j in range(N):
+        cs = []
+        cs_err = []
+        dum = min_var + j*step + 0.5*step
+        dum.append(Var_plot)
+        for b in bsm:
+            gamma_cal = []
+            Errors = []
+            for i in range(20):
+                path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+                table = Table.read(path)
+                e1 = table['e1_cal']
+                e_corr = table['anisotropy_corr']
+                P_g11 = table['Pg_11']
+                Flags = table['Flag']
+                Vars = table[Var]
+                Is_good1 = Flags == 0
+                Is_good2 = Vars >= (min_var + j*step)
+                Is_good3 = Vars < (min_var + (j+1)*step)
+                Is_good4 = np.logical_and(Is_good2, Is_good3)
+                Is_good = np.logical_and(Is_good1, Is_good4)
+                mean1 = np.mean(e1[Is_good]-b*e_corr[Is_good])
+                mean2 = np.mean(P_g11[Is_good])
+                gamma_cal.append(mean1/mean2)
+                Errors.append(Bootstrap(table, b, True))
+            popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
+            m = popt[0]
+            bias = popt[1]
+            cs.append(bias) 
+            cs_err.append(np.sqrt(pcov[1,1]))
+        popt, pcov = curve_fit(linear, bsm, cs, sigma = cs_err, absolute_sigma = True)
+        m2 = popt[0]
+        b2 = popt[1]
+        bs_real.append(-1*b2/m2)
+        bs_err.append(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2)))
+        print('boost factor determined with' + str(-1*b2/m2) + ' and ' + str(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))))
+    plt.errorbar(Var_plot, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'ro')
+    plt.xlabel(Var_name)
+    plt.ylabel('$b^{sm}_1$')
+    plt.savefig('boost_' + Var_name + '.pdf')
+    return 0
+
+boostFactorDep('sigma_mom', 'sigma moments', 6)
+boostFactorDep('rho4_mom', 'rho4', 6)
+boostFactorDep('aperture_sum', 'aperture sum', 6)
+
 e1_s = []
 
 #smear polarizability in dependence on magnitude
@@ -290,49 +348,47 @@ e1_s = []
 
 
 
-
-
 #b = 1#0.66
 
-bsm = np.linspace(1.1,1.4,3)
-gamma_real = np.linspace(-0.1, 0.1, 20)
-bs_err = []
-bs_real = []
-e_psfs = np.linspace(0,0.1,6)
-for j in range(6):
-    cs = []
-    cs_err = []
-    for b in bsm:
-        gamma_cal = []
-        Errors = []
-        for i in range(20):
-            path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
-            table = Table.read(path)
-            e1 = table['e1_cal']
-            e_corr = table['anisotropy_corr']
-            P_g11 = table['Pg_11']
-            Flags = table['Flag']
-            Is_good = Flags == 0
-            mean1 = np.mean(e1[Is_good]-b*e_corr[Is_good])
-            mean2 = np.mean(P_g11[Is_good])
-            gamma_cal.append(mean1/mean2)
-            Errors.append(Bootstrap(table, b, True))
-        popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
-        m = popt[0]
-        bias = popt[1]
-        cs.append(bias) 
-        cs_err.append(pcov[1,1])
-    popt, pcov = curve_fit(linear, bsm, cs, sigma = cs_err, absolute_sigma = True)
-    m2 = popt[0]
-    b2 = popt[1]
-    bs_real.append(-1*b2/m2)
-    bs_err.append(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))
-    print('boost factor determined with' + str(-1*b2/m2) + ' and ' + str(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2)))
+# bsm = np.linspace(1.1,1.4,3)
+# gamma_real = np.linspace(-0.1, 0.1, 20)
+# bs_err = []
+# bs_real = []
+# e_psfs = np.linspace(0,0.1,6)
+# for j in range(6):
+    # cs = []
+    # cs_err = []
+#     for b in bsm:
+#         gamma_cal = []
+#         Errors = []
+#         for i in range(20):
+#             path = config.workpath('Run' + str(j+1) + '/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+#             table = Table.read(path)
+#             e1 = table['e1_cal']
+#             e_corr = table['anisotropy_corr']
+#             P_g11 = table['Pg_11']
+#             Flags = table['Flag']
+#             Is_good = Flags == 0
+#             mean1 = np.mean(e1[Is_good]-b*e_corr[Is_good])
+#             mean2 = np.mean(P_g11[Is_good])
+#             gamma_cal.append(mean1/mean2)
+#             Errors.append(Bootstrap(table, b, True))
+#         popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
+#         m = popt[0]
+#         bias = popt[1]
+#         cs.append(bias) 
+#         cs_err.append(pcov[1,1])
+#     popt, pcov = curve_fit(linear, bsm, cs, sigma = cs_err, absolute_sigma = True)
+#     m2 = popt[0]
+#     b2 = popt[1]
+#     bs_real.append(-1*b2/m2)
+#     bs_err.append(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))
+#     print('boost factor determined with' + str(-1*b2/m2) + ' and ' + str(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2)))
     
-plt.errorbar(e_psfs, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'ro')
-plt.xlabel('$e_1^{PSF}$')
-plt.ylabel('$b^{sm}_1$')
-plt.savefig('Plots2/bsm_e_psf2.pdf')
+# plt.errorbar(e_psfs, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'ro')
+# plt.xlabel('$e_1^{PSF}$')
+# plt.ylabel('$b^{sm}_1$')
+# plt.savefig('Plots2/bsm_e_psf2.pdf')
 
 # gamma_real = np.linspace(-0.1,0.1,20)
 # gamma_cal = []
@@ -346,6 +402,7 @@ plt.savefig('Plots2/bsm_e_psf2.pdf')
 
 
 # b = 1
+# bss = [1.5539611125802553, 1.2647693321461664, 1.2632639648341009, 1.2317227364998693, 1.2262127036091375, 1.2257287304708997]
 # cs_corr = []
 # cs_corr2 = []
 # cs_uncorr = []
@@ -363,7 +420,7 @@ plt.savefig('Plots2/bsm_e_psf2.pdf')
 #         mean1 = np.mean(e1-b*e_corr)
 #         mean2 = np.mean(P_g11)
 #         gamma_cal.append(mean1/mean2 - gamma_real[i])
-#         Errors.append(Bootstrap(table, b))
+#         Errors.append(Bootstrap(table, b, False))
 #     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
 #     cs_corr.append(popt[1])
 #     print('corrected bias finished')
@@ -376,13 +433,13 @@ plt.savefig('Plots2/bsm_e_psf2.pdf')
 #         e1 = table['e1_cal']
 #         e_corr = table['anisotropy_corr']
 #         P_g11 = table['Pg_11']
-#         mean1 = np.mean(e1-1.2*e_corr)
+#         mean1 = np.mean(e1- bss[j] *e_corr)
 #         mean2 = np.mean(P_g11)
 #         gamma_cal.append(mean1/mean2 - gamma_real[i])
-#         Errors.append(Bootstrap(table, b))
+#         Errors.append(Bootstrap(table, bss[j]))
 #     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
 #     cs_corr2.append(popt[1])
-#     print('corrected bias2 finished with ' + str(popt[1]))
+#     print('corrected bias finished with ' + str(popt[1]))
 # for j in range(6):
 #     gamma_cal = []
 #     Errors = []
@@ -394,11 +451,11 @@ plt.savefig('Plots2/bsm_e_psf2.pdf')
 #         mean1 = np.mean(e1)
 #         mean2 = np.mean(P_g11)
 #         gamma_cal.append(mean1/mean2 - gamma_real[i])
-#         Errors.append(Bootstrap(table, 0))
+#         Errors.append(Bootstrap(table, 0, False))
 #     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
 #     cs_uncorr.append(popt[1])
 # plt.plot(e_psfs, cs_corr, 'ro', label = 'KSB')
-# plt.plot(e_psfs, cs_corr2, 'go', label = 'KSB with higher bsm')
+# plt.plot(e_psfs, cs_corr2, 'go', label = 'KSB with boost factor')
 # plt.plot(e_psfs, cs_uncorr,color = 'orange', marker = 'o', linestyle = '', label = 'uncorrected')
 # plt.xlabel('$e_1^{PSF}$')
 # plt.ylabel('$c_1$')

@@ -180,6 +180,7 @@ def calculate_ksb(path):
         tbl = cat.to_table(columns=columns)
         a = tbl['semimajor_sigma'] 
         b = tbl['semiminor_sigma'] 
+        my_moments = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 10, strict = (False))
         Radius = np.sqrt( a * b )
         tab.append(Radius)
         tab2.append(P_g11)
@@ -190,8 +191,8 @@ def calculate_ksb(path):
             tab6.append(0)
         else:
             tab6.append(1)
-        tab7.append(tbl['xcentroid'])
-        tab8.append(tbl['ycentroid'])
+        tab7.append(my_moments.moments_sigma)
+        tab8.append(my_moments.moments_rho4)
         count = count + 1 
     Col_A = Column(name = 'Pg_11', data = tab2)
     Col_B = Column(name = 'anisotropy_corr', data = tab3)
@@ -199,8 +200,8 @@ def calculate_ksb(path):
     Col_D = Column(name = 'aperture_sum', data = tab5)
     Col_E = Column(name = 'radius_est', data = tab)
     Col_F = Column(name = 'Flag', data = tab6)
-    Col_G = Column(name = 'x_centroid', data = tab7)
-    Col_H = Column(name = 'y_centroid', data = tab8)
+    Col_G = Column(name = 'sigma_mom', data = tab7)
+    Col_H = Column(name = 'rho4_mom', data = tab8)
     try:
         table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H])
         logging.info('Add columns to table')
@@ -211,8 +212,8 @@ def calculate_ksb(path):
         table.replace_column(name = 'aperture_sum', col = Col_D)
         table.replace_column(name = 'radius_est', col = Col_E)
         table.replace_column(name = 'Flag', col = Col_F)
-        table.replace_column(name = 'x_centroid', col = Col_G)
-        table.replace_column(name = 'y_centroid', col = Col_H)
+        table.replace_column(name = 'sigma_mom', col = Col_G)
+        table.replace_column(name = 'rho4_mom', col = Col_H)
         logging.info('replaced columns in table')
     table.write( path + '/Measured_ksb.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
@@ -278,5 +279,6 @@ def calculate_ksb_galsim(path):
 # mydir = config.workpath('Test_1')
 # calculate_ksb_galsim(mydir)
 
-
+# mydir = config.workpath('Run1/PSF_es_1')
+# calculate_ksb(mydir)
 # calculate_ksb_galsim('Test')
