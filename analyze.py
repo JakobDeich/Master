@@ -15,6 +15,24 @@ start = time.time()
 def linear(x, m, b):
     return m*x + b
 
+
+def Bootstrap_boost(e1_cal, anis_corr, Pg_11, b):
+    table = Table([e1_cal, anis_corr, Pg_11], names = ['e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4','f4']) 
+    Error = 0
+    gamma_errs = []
+    for i in range(200):
+        rng = np.random.default_rng()
+        tab_random = rng.choice(table, size = (len(table)))
+        e1_err = tab_random['e1_cal']
+        anis_err = tab_random['anisotropy_corr']
+        Pg_err = tab_random['Pg_11']
+        pol_err = np.mean(e1_err - b* anis_err)
+        Pg_err = np.mean(Pg_err)
+        gamma_errs.append(pol_err/Pg_err)
+    Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))
+    return Error
+        
+        
 def Bootstrap(table, b, flag = True):
     Error = 0
     gamma_errs = []
@@ -60,12 +78,61 @@ def Bootstrap(table, b, flag = True):
         Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))  
     return Error
 
+def Filter(table, Filter_Var, Sorting_Var='' , Sort = False, min_var = 0, step = 0, j = 0):
+    if Sort == False:
+        Sorting_Var = Filter_Var
+    Filter_Var1 = table[Filter_Var]
+    Vars2 = table[Sorting_Var]
+    if Sorting_Var == 'aperture_sum':
+        Vars2 = 24.6 - 2.5 * np.log10(3.1/(3*565)* Vars2)
+    if Filter_Var == 'aperture_sum':
+        Filter_Var1 = 24.6 - 2.5 * np.log10(3.1/(3*565)* Filter_Var1)
+    Good2 = np.isnan(table['rho4_mom'])
+    Good2 = np.logical_not(Good2)
+    Good2 = np.array([Good2]).transpose()
+    Good3 = table['aperture_sum'] > 600
+    Good2 = np.logical_and(Good2, Good3)
+    Good1 = table['sigma_mom'] > 0
+    Good1 = np.array([Good1]).transpose()
+    Good = np.logical_and(Good1, Good2)
+    Good = Good[:,0]
+    if Sort == True:
+        Is_good2 = Vars2 >= (min_var + j*step)
+        Is_good3 = Vars2 < (min_var + (j+1)*step)
+        Is_good4 = np.logical_and(Is_good2, Is_good3)
+        if Sorting_Var == 'aperture_sum':
+            Is_good4 = Is_good4[:,0]
+        Good = np.logical_and(Is_good4, Good)
+    Filter_Var1 = Filter_Var1[Good]
+    return Filter_Var1
+ 
+
+# a = [-1,2,4,650,np.log(-1)]   
+# table = Table([a], names = ['sigma_mom'], dtype = ['f4'])
+# path = config.workpath('Run6/PSF_es_2/Measured_ksb.fits')
+# table = Table.read(path)
+# Var = Filter(table, 'aperture_sum')
+# min_var = min(Var)
+# max_var = max(Var)
+# print(min_var, max_var)
+# step = (max_var-min_var)/6
+# print(Filter(table, 'anisotropy_corr','aperture_sum', True, min_var, step, j=1))
+
 def boostFactorDep(Var, Var_name, N):
-    path = config.workpath('Run6/PSF_es_1/Measured_ksb.fits')
-    table = Table.read(path)
-    Vars1 = table[Var]
-    min_var = min(Vars1)
-    max_var = max(Vars1)
+    mins = []
+    maxs = []
+    for j in range(N):
+        for i in range(20):
+            path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+            table1 = Table.read(path)
+            Vars1 = Filter(table1, Var)
+            min_var1 = min(Vars1)
+            max_var1 = max(Vars1)
+            mins.append(min_var1)
+            maxs.append(max_var1)
+    min_var = min(mins)
+    max_var = max(maxs)
+    print(min_var, max_var)
     step = (max_var-min_var)/N
     Var_plot = []
     bsm = np.linspace(1.1,1.4,3)
@@ -76,27 +143,20 @@ def boostFactorDep(Var, Var_name, N):
         cs = []
         cs_err = []
         dum = min_var + j*step + 0.5*step
-        dum.append(Var_plot)
+        Var_plot.append(dum)
         for b in bsm:
             gamma_cal = []
             Errors = []
             for i in range(20):
                 path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
                 table = Table.read(path)
-                e1 = table['e1_cal']
-                e_corr = table['anisotropy_corr']
-                P_g11 = table['Pg_11']
-                Flags = table['Flag']
-                Vars = table[Var]
-                Is_good1 = Flags == 0
-                Is_good2 = Vars >= (min_var + j*step)
-                Is_good3 = Vars < (min_var + (j+1)*step)
-                Is_good4 = np.logical_and(Is_good2, Is_good3)
-                Is_good = np.logical_and(Is_good1, Is_good4)
-                mean1 = np.mean(e1[Is_good]-b*e_corr[Is_good])
-                mean2 = np.mean(P_g11[Is_good])
+                e1 = Filter(table, 'e1_cal',Var,True , min_var, step, j)
+                e_corr = Filter(table, 'anisotropy_corr',Var,True , min_var, step, j)
+                P_g11 = Filter(table, 'Pg_11',Var,True ,min_var, step, j)
+                mean1 = np.mean(e1-b*e_corr)
+                mean2 = np.mean(P_g11)
                 gamma_cal.append(mean1/mean2)
-                Errors.append(Bootstrap(table, b, True))
+                Errors.append(Bootstrap_boost(e1, e_corr, P_g11, b))
             popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
             m = popt[0]
             bias = popt[1]
@@ -107,18 +167,35 @@ def boostFactorDep(Var, Var_name, N):
         b2 = popt[1]
         bs_real.append(-1*b2/m2)
         bs_err.append(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2)))
-        print('boost factor determined with' + str(-1*b2/m2) + ' and ' + str(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))))
-    plt.errorbar(Var_plot, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'ro')
+        print('boost factor determined with: ' + str(-1*b2/m2) + ' and ' + str(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))))
+    plt.errorbar(Var_plot, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'r.')
     plt.xlabel(Var_name)
     plt.ylabel('$b^{sm}_1$')
-    plt.savefig('boost_' + Var_name + '.pdf')
+    plt.savefig('Plots2/boost_' + Var_name + '.pdf')
     return 0
 
-boostFactorDep('sigma_mom', 'sigma moments', 6)
-boostFactorDep('rho4_mom', 'rho4', 6)
-boostFactorDep('aperture_sum', 'aperture sum', 6)
+def boostFactorDep_save(Var, Var_name, N):
+    try:
+        boostFactorDep(Var, Var_name, N)
+    except:
+        boostFactorDep(Var, Var_name, N-1)
+    return 0
+        
+
+#boostFactorDep('sigma_mom', 'sigma moments', 5)
+#boostFactorDep('rho4_mom', 'rho4', 5)
+#boostFactorDep('aperture_sum', 'magnitude', 5)
+#boostFactorDep('mag', 'magnitude GEMS', 5)
+boostFactorDep('r_half', 'half light radius GEMS [arcsec]', 5)
 
 e1_s = []
+
+# path = config.workpath('Run1/PSF_es_1/Measured_ksb.fits')
+# table1 = Table.read(path)
+# AS = table1['sigma_mom']
+# # AS = 24.6 - 2.5 * np.log10(3.1/(3*565)* AS)
+# plt.hist(AS, 10)                          
+
 
 #smear polarizability in dependence on magnitude
 # bsm = np.linspace(1,1.4,8)
