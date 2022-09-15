@@ -186,7 +186,7 @@ def boostFactorDep_save(Var, Var_name, N):
 #boostFactorDep('rho4_mom', 'rho4', 5)
 #boostFactorDep('aperture_sum', 'magnitude', 5)
 #boostFactorDep('mag', 'magnitude GEMS', 5)
-boostFactorDep('r_half', 'half light radius GEMS [arcsec]', 5)
+#boostFactorDep('r_half', 'half light radius GEMS [arcsec]', 5)
 
 e1_s = []
 
@@ -196,6 +196,13 @@ e1_s = []
 # # AS = 24.6 - 2.5 * np.log10(3.1/(3*565)* AS)
 # plt.hist(AS, 10)                          
 
+path = config.workpath('Run6/PSF_es_1/Measured_ksb.fits')
+table = Table.read(path)
+Good = table['sigma_mom'] > 0
+plt.scatter(table['r_half'][Good], table['sigma_mom'][Good], s=2)
+plt.xlabel('half light radius GEMS [arcsec]')
+plt.ylabel('sigma moment')
+plt.savefig('Plots2/r_half_sigma_mom.pdf')
 
 #smear polarizability in dependence on magnitude
 # bsm = np.linspace(1,1.4,8)
