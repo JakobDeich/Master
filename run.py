@@ -21,8 +21,9 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
         psf_pol(psf_es[i], number[i])
 #psf_pol_run(6,0.1)
 
-simulation.simulate_Grids_psf(20, 6, 'Run', '/PSF_es', 0.1)
-simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
+#simulation.simulate_Grids_psf(20, 6, 'Run', '/PSF_es', 0.1)
+# simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
+simulation.generate_sim_trainingSet('Test', 4)
 
 end = time.time()
 total_time = (end - start)/(60*60*24)  #run time in days

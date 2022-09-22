@@ -25,6 +25,14 @@ def gal_flux(mag):
     Z_p = 24.6
     return t_exp/gain *10**(-0.4*(mag-Z_p)) 
 
+def sky_flux(mag_sky):
+    t_exp = 3*565 #s
+    gain = 3.1 #e/ADU
+    Z_p = 24.6
+    l_pix = 0.1 #arcsec
+    sky_flux = l_pix**2*t_exp/gain*10**(-0.4*(mag_sky-Z_p))
+    return sky_flux
+
 def generate_psf_image(path):
     table = Table.read(path + '/Input_data.fits')
     Gamma = Table.read(path + '/Gamma.fits')
@@ -40,7 +48,73 @@ def generate_psf_image(path):
     psf_image.write(file_name)
     return None
 
+def generate_realisations(path_table, path, case):
+    random_seed = 15783
+    table = Table.read(path_table)
+    stamp_xsize = table.meta['STAMP_X']
+    stamp_ysize = table.meta['STAMP_Y']
+    n_rea = table.meta['N_REA']
+    n_canc = table.meta['N_CANC']
+    table = table[n_rea*n_canc*case:n_rea*n_canc*(case+1)]
+    n_cas = table.meta['N_CAS']
+    # print(table['bound_y_bottom'])
+    pixel_scale = 0.1 #arcsec/pixel
+    mag_sky = 22.35
+    gain = 3.1 #e/ADU
+    gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize*n_cas-1, scale = pixel_scale)
+    #define optical psf with Euclid condition and anisotropy
+    psf = generate_psf()
+    #creating the grid and placing galaxies on it
+    count = 0
+    count1 = 0
+    for Galaxy in table:
+        if count%100==0:
+            print(count, case)
+        noise = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize*n_cas-1, scale = pixel_scale)
+        Sky_flux = sky_flux(mag_sky)
+        psf = psf.shear(e1 = Galaxy['psf_pol'])
+        flux = gal_flux(Galaxy['mag'])
+        #define galaxy with sersic profile
+        gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
+        gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
+        gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
+        #create grid
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+        sub_gal_image = gal_image[b] 
+        sub_noise_image = noise[b]
+        #shift galaxies and psfs on the grid
+        gal = gal.shift(Galaxy['pixel_shift_x'], Galaxy['pixel_shift_y'])
+        #shear galaxy
+        gal = gal.shear(g1 = Galaxy['gamma1'])
+        #convolve galaxy and psf 
+        final_gal = galsim.Convolve([psf,gal], gsparams = gs)
+        final_gal.drawImage(sub_gal_image)
+        #add noise
+        if Galaxy['pixel_noise'] == 0:
+            rng = galsim.BaseDeviate(random_seed + count1)
+            CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
+            sub_gal_image.addNoise(CCD_Noise)
+        else:
+            rng = galsim.BaseDeviate(random_seed + count1)
+            CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
+            sub_noise_image.addNoise(CCD_Noise)
+            sub_noise_image = -1*sub_noise_image 
+            sub_gal_image = sub_gal_image + sub_noise_image
+            count1 = count1 + 1
+        #sub_gal_image.addNoise(CCD_Noise)
+        count = count + 1
+    if not os.path.isdir(path):
+            os.mkdir(path)
+    file_name = os.path.join(path, 'Grid' + str(case) + '.fits')
+    gal_image.write(file_name)
+    return None
     
+
+    
+
+# path = config.workpath('Test/')
+# generate_realisations(path + 'Input_data.fits', path, 9)
+
 def generate_image(path_table, path):
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='image.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
