@@ -8,6 +8,7 @@ import os
 import logging
 import time
 import config
+from multiprocessing import Pool
 #import numpy.random.Generator
 
 def trunc_rayleigh(sigma, max_val):
@@ -17,20 +18,13 @@ def trunc_rayleigh(sigma, max_val):
         tmp = np.random.rayleigh(sigma)
     return tmp
 
-def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, path):
+def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, n_sersic, r_half, psf_pol, case, path):
+    print('case ' + str(case) + ' building table')
+    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
     random_seed = 15783
-    cat = galsim.Catalog('gems_20090807.fits')
-    tab = Table(names = ['mag', 'n', 'r_half'], dtype = ['f4', 'f4', 'f4'])
-    for i in range(cat.nobjects):
-        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 25.0) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 6.0) and (3.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
-            params = [cat.get(i, 'ST_MAG_GALFIT'), cat.get(i, 'ST_N_GALFIT'), cat.get(i, 'ST_RE_GALFIT')*0.03]
-            tab.add_row(params)
     rng = np.random.default_rng()
-    tab_random = rng.choice(tab, size = n_cas)
-    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'pixel_noise', 'n_case'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'i4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
     rotation = np.linspace(0, 180, n_rot, endpoint= False)
-    shear = np.linspace(-0.1, 0.1, n_shear)
-    psf_pols = np.linspace(-0.1,0.1,100)
+    shear = np.linspace(-0.6,0.6,n_shear)
     values = []
     count1 = 0
     for i in range(n_shear):
@@ -41,28 +35,48 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, pat
                 count1 = count1 + 1
     count = 0
     n_canc = n_shear*n_rot*2
+    for realisation in range(n_rea):
+        ud = galsim.UniformDeviate(random_seed + count + 1)
+        dx = (2*ud()-1) * 0.1/2
+        dy = (2*ud()-1) * 0.1/2
+        e_betrag = trunc_rayleigh(0.25, 0.7)
+        phi = rng.choice(180)
+        for Cancellation in values:
+            phi2 = phi + Cancellation[1]
+            e1 = e_betrag*np.cos(2*phi2)
+            e2 = e_betrag*np.sin(2*phi2)
+            params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, realisation*stamp_xsize*n_canc + Cancellation[2], realisation*stamp_xsize*n_canc + Cancellation[3], 1, stamp_ysize-1, dx, dy, Cancellation[4]]
+            table.add_row(params)
+        count = count + 1
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    file_name = os.path.join(path, 'Input_data_' + str(case) + '.fits')
+    table.write( file_name , overwrite=True) 
+    print('case ' + str(case) + ' finished table')
+    return None
+
+def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, path):
+    cat = galsim.Catalog('gems_20090807.fits')
+    tab = Table(names = ['mag', 'n', 'r_half'], dtype = ['f4', 'f4', 'f4'])
+    for i in range(cat.nobjects):
+        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 25.0) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 6.0) and (3.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
+            params = [cat.get(i, 'ST_MAG_GALFIT'), cat.get(i, 'ST_N_GALFIT'), cat.get(i, 'ST_RE_GALFIT')*0.03]
+            tab.add_row(params)
+    rng = np.random.default_rng()
+    tab_random = rng.choice(tab, size = n_cas)
+    psf_pols = np.linspace(-0.1,0.1,100)
+    final = []
+    count = 0
     for case in tab_random:
         psf_pol = rng.choice(psf_pols, 1)
         mag = case['mag']
         n_sersic = case['n']
         r_half = case['r_half']
-        for realisation in range(n_rea):
-            ud = galsim.UniformDeviate(random_seed + count + 1)
-            dx = (2*ud()-1) * 0.1/2
-            dy = (2*ud()-1) * 0.1/2
-            e_betrag = trunc_rayleigh(0.25, 0.7)
-            phi = rng.choice(180)
-            for Cancellation in values:
-                phi2 = phi + Cancellation[1]
-                e1 = e_betrag*np.cos(2*phi2)
-                e2 = e_betrag*np.sin(2*phi2)
-                params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, realisation*stamp_xsize*n_canc + Cancellation[2], realisation*stamp_xsize*n_canc + Cancellation[3], count*stamp_ysize+1, (count+1)*stamp_ysize-1, dx, dy, Cancellation[4], count]
-                t.add_row(params)
+        params = [n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, n_sersic, r_half, psf_pol, count, path]
+        final.append(params)
         count = count + 1
-    if not os.path.isdir(path):
-        os.mkdir(path)
-    file_name = os.path.join(path, 'Input_data.fits')
-    t.write( file_name , overwrite=True) 
+    with Pool() as pool:
+            pool.starmap(tab_realisation, final)
     return None
 
 # training_set_tab(2, 2, 4, 3, 64, 64, 'Test')

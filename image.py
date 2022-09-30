@@ -62,7 +62,7 @@ def generate_realisations(path_table, path, case):
     pixel_scale_small = 0.02
     mag_sky = 22.35
     gain = 3.1 #e/ADU
-    gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize*n_cas-1, scale = pixel_scale)
+    gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize-1, scale = pixel_scale)
     #define optical psf with Euclid condition and anisotropy
     psf = generate_psf()
     #creating the grid and placing galaxies on it
@@ -117,7 +117,7 @@ def generate_realisations(path_table, path, case):
         count = count + 1
     if not os.path.isdir(path):
             os.mkdir(path)
-    file_name = os.path.join(path, 'Grid' + str(case) + '.fits')
+    file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
     gal_image.write(file_name)
     return None
     

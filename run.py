@@ -28,8 +28,8 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 
 
 simulation.generate_sim_trainingSet('Test', 100)
-ksb.calculate_ksb_training('Test')
-analyze.determine_boost('Test')
+# ksb.calculate_ksb_training('Test')
+# analyze.determine_boost('Test')
 
 
 end = time.time()

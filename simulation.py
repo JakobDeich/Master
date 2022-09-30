@@ -15,33 +15,18 @@ start = time.time()
 
 def generate_sim_trainingSet(path, case):
     mydir =config.workpath(path)
-    tab.training_set_tab(10, 10, case, 10, 64, 64, mydir)
-    table = Table.read(mydir + '/Input_data.fits')
+    tab.training_set_tab(5, 10, case, 10, 64, 64, mydir)
     cases = np.arange(case)
-    stamp_xsize = table.meta['STAMP_X']
-    stamp_ysize = table.meta['STAMP_Y']
-    n_rea = table.meta['N_REA']
-    n_cas = table.meta['N_CAS']
-    n_canc = table.meta['N_CANC']
-    gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize*n_cas-1, scale = 0.1)
     #gal_image = []
     final = []
     for i in range(case):
-        params = [mydir + '/Input_data.fits', mydir, cases[i]]
+        params = [mydir + '/Input_data_' + str(i) + '.fits', mydir, cases[i]]
         final.append(params)
     with Pool() as pool:
         pool.starmap(image.generate_realisations, final)
-    for i in range(case):
-        Gal = galsim.fits.read(mydir + '/Grid' + str(i) + '.fits')
-        gal_image = gal_image + Gal
-        os.remove(mydir + '/Grid' + str(i) + '.fits')
-    if not os.path.isdir(mydir):
-        os.mkdir(mydir)
-    file_name = os.path.join(mydir, 'Grid.fits')
-    gal_image.write(file_name)
     return None
 
-# generate_sim_trainingSet('Test', 100)    
+#generate_sim_trainingSet('Test', 4)    
 
 
 def generate_simulation(only_one_table = False, path_table = 'Test/table.fits', dirname='test', gamma1 = 0, gamma2 = 0, psf_pol = 0):   
