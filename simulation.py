@@ -15,7 +15,7 @@ start = time.time()
 
 def generate_sim_trainingSet(path, case):
     mydir =config.workpath(path)
-    tab.training_set_tab(2, 2, case, 3, 64, 64, mydir)
+    tab.training_set_tab(10, 10, case, 10, 64, 64, mydir)
     table = Table.read(mydir + '/Input_data.fits')
     cases = np.arange(case)
     stamp_xsize = table.meta['STAMP_X']

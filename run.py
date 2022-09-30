@@ -3,6 +3,8 @@ import config
 import numpy as np
 import time
 import os
+import ksb
+import analyze
 from multiprocessing import Pool
 
 start = time.time()
@@ -23,7 +25,12 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 
 #simulation.simulate_Grids_psf(20, 6, 'Run', '/PSF_es', 0.1)
 # simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
-simulation.generate_sim_trainingSet('Test', 4)
+
+
+simulation.generate_sim_trainingSet('Test', 100)
+ksb.calculate_ksb_training('Test')
+analyze.determine_boost('Test')
+
 
 end = time.time()
 total_time = (end - start)/(60*60*24)  #run time in days

@@ -27,7 +27,7 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, pat
             tab.add_row(params)
     rng = np.random.default_rng()
     tab_random = rng.choice(tab, size = n_cas)
-    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'i4'], meta = {'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
+    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'pixel_noise', 'n_case'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'i4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
     rotation = np.linspace(0, 180, n_rot, endpoint= False)
     shear = np.linspace(-0.1, 0.1, n_shear)
     psf_pols = np.linspace(-0.1,0.1,100)
@@ -56,7 +56,7 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, pat
                 phi2 = phi + Cancellation[1]
                 e1 = e_betrag*np.cos(2*phi2)
                 e2 = e_betrag*np.sin(2*phi2)
-                params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, realisation*stamp_xsize*n_canc + Cancellation[2], realisation*stamp_xsize*n_canc + Cancellation[3], count*stamp_ysize+1, (count+1)*stamp_ysize-1, dx, dy, Cancellation[4]]
+                params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, realisation*stamp_xsize*n_canc + Cancellation[2], realisation*stamp_xsize*n_canc + Cancellation[3], count*stamp_ysize+1, (count+1)*stamp_ysize-1, dx, dy, Cancellation[4], count]
                 t.add_row(params)
         count = count + 1
     if not os.path.isdir(path):
@@ -73,7 +73,8 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, pat
 # # # # psf = table['psf_pol']
 # # # # r_half = table['r_half']
 # # # #nn = table['num_cas']
-# print(table['bound_y_bottom'], table['bound_x_left'])
+# g1 = table['gamma1']
+# print(table['gamma1'])
     
 def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     log_format = '%(asctime)s %(filename)s: %(message)s'

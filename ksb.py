@@ -219,6 +219,89 @@ def calculate_ksb(path):
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
+def calculate_ksb_training(path):
+    sigw_sub = 10 
+    path = config.workpath(path)
+    log_format = '%(asctime)s %(filename)s: %(message)s'
+    logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+    table = Table.read(path + '/Input_data.fits')
+    logging.info('Read in table from %s /table.fits' %path)
+    image_file = path + '/Grid.fits'
+    gal_image = galsim.fits.read(image_file)
+    stamp_x_size = table.meta['STAMP_X']
+    stamp_y_size = table.meta['STAMP_Y']
+    tab = []
+    tab2 = []
+    tab3 = []
+    tab4 = []
+    tab5 = []
+    tab6 = []
+    tab7 = []
+    tab8 = []
+    logging.info('start ksb algorithm')
+    count = 0
+    positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
+    aperture = CircularAperture(positions, r=sigw_sub)
+    for Galaxy in table:        
+        if count%1000==0:
+            logging.warning('Galaxy number %i' %count)
+            print(str(count) + ' Galaxies examined')
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+        PSF = galsim.fits.read(path + '/PSF_' + str(Galaxy['n_case']) + '.fits')
+        meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
+        sub_gal_image = gal_image[b] 
+        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+        meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = sigw_sub)
+        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+        #e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
+        P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
+        #P_g22 = meas_on_galaxy['Psh22']-meas_on_galaxy['Psm22']/meas_on_psf['Psm22']*meas_on_psf['Psh22']
+        phot_table = aperture_photometry(sub_gal_image.array, aperture)
+        cat = data_properties(sub_gal_image.array)
+        columns = ['label', 'xcentroid', 'ycentroid', 'semimajor_sigma','semiminor_sigma', 'orientation']
+        tbl = cat.to_table(columns=columns)
+        a = tbl['semimajor_sigma'] 
+        b = tbl['semiminor_sigma'] 
+        my_moments = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 10, strict = (False))
+        Radius = np.sqrt( a * b )
+        tab.append(Radius)
+        tab2.append(P_g11)
+        tab3.append(e1_anisotropy_correction)
+        tab4.append(meas_on_galaxy['e1'])
+        tab5.append(phot_table['aperture_sum'])
+        if phot_table['aperture_sum'] > 600:
+            tab6.append(0)
+        else:
+            tab6.append(1)
+        tab7.append(my_moments.moments_sigma)
+        tab8.append(my_moments.moments_rho4)
+        count = count + 1 
+    Col_A = Column(name = 'Pg_11', data = tab2)
+    Col_B = Column(name = 'anisotropy_corr', data = tab3)
+    Col_C = Column(name = 'e1_cal', data = tab4)
+    Col_D = Column(name = 'aperture_sum', data = tab5)
+    Col_E = Column(name = 'radius_est', data = tab)
+    Col_F = Column(name = 'Flag', data = tab6)
+    Col_G = Column(name = 'sigma_mom', data = tab7)
+    Col_H = Column(name = 'rho4_mom', data = tab8)
+    try:
+        table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H])
+        logging.info('Add columns to table')
+    except:
+        table.replace_column(name = 'Pg_11', col = Col_A)
+        table.replace_column(name = 'anisotropy_corr', col = Col_B)
+        table.replace_column(name = 'e1_cal', col = Col_C)
+        table.replace_column(name = 'aperture_sum', col = Col_D)
+        table.replace_column(name = 'radius_est', col = Col_E)
+        table.replace_column(name = 'Flag', col = Col_F)
+        table.replace_column(name = 'sigma_mom', col = Col_G)
+        table.replace_column(name = 'rho4_mom', col = Col_H)
+        logging.info('replaced columns in table')
+    table.write( path + '/Measured_ksb.fits' , overwrite=True) 
+    logging.info('overwritten old table with new table including e1_cal and Pg_11')
+    return None
+
+
 def calculate_ksb_galsim(path):
     image.generate_psf_image(path)
     PSF = galsim.fits.read(path + '/PSF.fits')

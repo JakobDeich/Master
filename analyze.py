@@ -16,18 +16,73 @@ def linear(x, m, b):
     return m*x + b
 
 
-def Bootstrap_boost(e1_cal, anis_corr, Pg_11, b):
-    table = Table([e1_cal, anis_corr, Pg_11], names = ['e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4','f4']) 
+def determine_boost(path):
+    mydir = config.workpath(path)
+    table = Table.read(mydir + '/Measured_ksb.fits')
+    cancellations = table.meta['N_CANC']
+    realisations = table.meta['N_REA']
+    Case = cancellations * realisations
+    cases = table.meta['N_CAS']
+    shears = table.meta['N_SHEAR']
+    shear = np.linspace(-0.1, 0.1, shears)
+    bs_real = []
+    for i in range(cases):
+        print(i)
+        table1 = table[i*Case:(i+1)*Case]
+        bsm = np.linspace(1.1,1.4,3)
+        gamma_real = np.linspace(-0.1, 0.1, shears)
+        cs = []
+        for b in bsm:
+            gamma_cal = []
+            for j in shear:
+                Params = []
+                for Galaxy in table1:
+                    if (Galaxy['gamma1']-10**(-4)) <= j and (Galaxy['gamma1']+10**(-4)) >= j:
+                        params = [Galaxy['e1_cal'], Galaxy['anisotropy_corr'], Galaxy['Pg_11']]
+                        Params.append(params)
+                e1 = np.asarray(Params[0])
+                e_corr = np.asarray(Params[1])
+                P_g11 = np.asarray(Params[2])
+                mean1 = np.mean(e1-b*e_corr)
+                mean2 = np.mean(P_g11)
+                gamma_cal.append(mean1/mean2)
+            popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
+            bias = popt[1]
+            cs.append(bias) 
+        popt, pcov = curve_fit(linear, bsm, cs)
+        m2 = popt[0]
+        b2 = popt[1]
+        bs_real.append(-1*b2/m2)
+    print(bs_real)
+    return None
+
+    
+
+
+def Bootstrap_boost(table,bin_digit,bin_num, b):
     Error = 0
     gamma_errs = []
+    Good = bin_digit == bin_num
+    size = sum(Good)
+    numbers = table['number'][Good]
     for i in range(200):
         rng = np.random.default_rng()
-        tab_random = rng.choice(table, size = (len(table)))
-        e1_err = tab_random['e1_cal']
-        anis_err = tab_random['anisotropy_corr']
-        Pg_err = tab_random['Pg_11']
-        pol_err = np.mean(e1_err - b* anis_err)
-        Pg_err = np.mean(Pg_err)
+        numb_random = rng.choice(numbers, size = (size))
+        e1_err1 = table['e1_cal'][2*numb_random-2]
+        e1_err2 = table['e1_cal'][2*numb_random-1]
+        e1_err = np.concatenate((e1_err1, e1_err2))
+        anis_err1 = table['anisotropy_corr'][2*numb_random-2]
+        anis_err2 = table['anisotropy_corr'][2*numb_random-1]
+        anis_err = np.concatenate((anis_err1, anis_err2))
+        Pg_err2 = table['Pg_11'][2*numb_random-2]
+        Pg_err1 = table['Pg_11'][2*numb_random-1]
+        Pg_err = np.concatenate((Pg_err1, Pg_err2))
+        Flags1 = table['Flag'][2*numb_random-2]
+        Flags2 = table['Flag'][2*numb_random-1]  
+        Flags = np.concatenate((Flags1, Flags2))
+        Is_good = Flags == 0
+        pol_err = np.mean(e1_err[Is_good] - b* anis_err[Is_good])
+        Pg_err = np.mean(Pg_err[Is_good])
         gamma_errs.append(pol_err/Pg_err)
     Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))
     return Error
@@ -78,7 +133,7 @@ def Bootstrap(table, b, flag = True):
         Error = np.sqrt(np.mean((gamma_errs-np.mean(gamma_errs))**2))  
     return Error
 
-def Filter(table, Filter_Var, Sorting_Var='' , Sort = False, min_var = 0, step = 0, j = 0):
+def Filter(table, Filter_Var, Sorting_Var='' , bin_digit = [], Sort = False, bin_num = 0):
     if Sort == False:
         Sorting_Var = Filter_Var
     Filter_Var1 = table[Filter_Var]
@@ -97,44 +152,67 @@ def Filter(table, Filter_Var, Sorting_Var='' , Sort = False, min_var = 0, step =
     Good = np.logical_and(Good1, Good2)
     Good = Good[:,0]
     if Sort == True:
-        Is_good2 = Vars2 >= (min_var + j*step)
-        Is_good3 = Vars2 < (min_var + (j+1)*step)
-        Is_good4 = np.logical_and(Is_good2, Is_good3)
+        Good1 = bin_digit == bin_num
         if Sorting_Var == 'aperture_sum':
-            Is_good4 = Is_good4[:,0]
-        Good = np.logical_and(Is_good4, Good)
+            Good1 = Good1[:,0]
+        Good = np.logical_and(Good, Good1)
     Filter_Var1 = Filter_Var1[Good]
     return Filter_Var1
  
 
 # a = [-1,2,4,650,np.log(-1)]   
 # table = Table([a], names = ['sigma_mom'], dtype = ['f4'])
-# path = config.workpath('Run6/PSF_es_2/Measured_ksb.fits')
+
+
+# q = np.linspace(0,1,6)
+# Good = q > 0
+# q = q[Good]
+# path = config.workpath('Run6/PSF_es_5/Measured_ksb.fits')
 # table = Table.read(path)
-# Var = Filter(table, 'aperture_sum')
+# ns = table['n']
+# rho4 = table['rho4_mom']
+# Good = rho4 > 0
+# plt.scatter(ns[Good], rho4[Good])
+# plt.xlabel('sersic index n GEMS')
+# plt.ylabel('rho4')
+# plt.savefig('Plots2/rho4_sersic.pdf')
+# Vars1 = Filter(table, 'r_half')
+# bins = np.quantile(table['r_half'], q = q)
+# bin_dig = np.digitize(table['r_half'], bins)
+# print(bin_dig, bins, q)
+# for j in range(5):
+#     Var = Filter(table, 'sigma_mom', 'r_half', bin_dig ,True , j)
+#     print(np.mean(Var), len(Var))
 # min_var = min(Var)
 # max_var = max(Var)
 # print(min_var, max_var)
 # step = (max_var-min_var)/6
 # print(Filter(table, 'anisotropy_corr','aperture_sum', True, min_var, step, j=1))
 
-def boostFactorDep(Var, Var_name, N):
-    mins = []
-    maxs = []
-    for j in range(N):
-        for i in range(20):
-            path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
-            table1 = Table.read(path)
-            Vars1 = Filter(table1, Var)
-            min_var1 = min(Vars1)
-            max_var1 = max(Vars1)
-            mins.append(min_var1)
-            maxs.append(max_var1)
-    min_var = min(mins)
-    max_var = max(maxs)
-    print(min_var, max_var)
-    step = (max_var-min_var)/N
-    Var_plot = []
+def boostFactorDep(Var,Var_initial, Var_name, N):
+    q = np.linspace(0,1,N+1)
+    Good = q > 0
+    q = q[Good]
+    #for j in range(N):
+        # for i in range(20):
+        #     path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+        #     table1 = Table.read(path)
+        #     Vars1 = Filter(table1, Var)
+        #     min_var1 = min(Vars1)
+        #     max_var1 = max(Vars1)
+        #     mins.append(min_var1)
+        #     maxs.append(max_var1)
+    path = config.workpath('Run6/PSF_es_20/Measured_ksb.fits')
+    table1 = Table.read(path)
+    Vars1 = Filter(table1, Var_initial)
+    # min_var = min(mins)
+    # max_var = max(maxs)
+    # print(min_var, max_var)
+    bins = np.quantile(table1[Var_initial], q = q)
+    bin_dig = np.digitize(table1[Var_initial], bins)
+    print(bins, bin_dig)
+    # step = (max_var-min_var)/N
+    Var_plot = Table(names =['means', 'size', 'bin'], dtype = ['f4', 'i4', 'i4'])
     bsm = np.linspace(1.1,1.4,3)
     gamma_real = np.linspace(-0.1, 0.1, 20)
     bs_err = []
@@ -142,21 +220,22 @@ def boostFactorDep(Var, Var_name, N):
     for j in range(N):
         cs = []
         cs_err = []
-        dum = min_var + j*step + 0.5*step
-        Var_plot.append(dum)
         for b in bsm:
             gamma_cal = []
             Errors = []
             for i in range(20):
                 path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
                 table = Table.read(path)
-                e1 = Filter(table, 'e1_cal',Var,True , min_var, step, j)
-                e_corr = Filter(table, 'anisotropy_corr',Var,True , min_var, step, j)
-                P_g11 = Filter(table, 'Pg_11',Var,True ,min_var, step, j)
+                e1 = Filter(table, 'e1_cal',Var_initial, bin_dig ,True , j)
+                e_corr = Filter(table, 'anisotropy_corr',Var_initial, bin_dig ,True , j)
+                P_g11 = Filter(table, 'Pg_11',Var_initial, bin_dig ,True , j)
+                Var_t = Filter(table, Var_initial,Var_initial, bin_dig ,True , j)
+                params = [np.mean(Var_t), len(Var_t), j]
+                Var_plot.add_row(params)
                 mean1 = np.mean(e1-b*e_corr)
                 mean2 = np.mean(P_g11)
                 gamma_cal.append(mean1/mean2)
-                Errors.append(Bootstrap_boost(e1, e_corr, P_g11, b))
+                Errors.append(Bootstrap_boost(table, bin_dig, j, b))
             popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
             m = popt[0]
             bias = popt[1]
@@ -168,7 +247,13 @@ def boostFactorDep(Var, Var_name, N):
         bs_real.append(-1*b2/m2)
         bs_err.append(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2)))
         print('boost factor determined with: ' + str(-1*b2/m2) + ' and ' + str(np.sqrt(np.sqrt((1/m2*pcov[1,1])**2 + (b2/m2**2*pcov[0,0])**2))))
-    plt.errorbar(Var_plot, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'r.')
+    Var_plots = []
+    for bins in range(N):
+        Good = Var_plot['bin']==bins
+        size = sum(Var_plot['size'][Good])
+        weighted_mean = sum(Var_plot['means'][Good]*Var_plot['size'][Good])
+        Var_plots.append(weighted_mean/size)
+    plt.errorbar(Var_plots, bs_real, yerr = bs_err, ecolor = 'red', fmt = 'r.')
     plt.xlabel(Var_name)
     plt.ylabel('$b^{sm}_1$')
     plt.savefig('Plots2/boost_' + Var_name + '.pdf')
@@ -182,13 +267,13 @@ def boostFactorDep_save(Var, Var_name, N):
     return 0
         
 
-#boostFactorDep('sigma_mom', 'sigma moments', 5)
+#boostFactorDep('sigma_mom','r_half', 'sigma moments', 5)
 #boostFactorDep('rho4_mom', 'rho4', 5)
-#boostFactorDep('aperture_sum', 'magnitude', 5)
+#boostFactorDep('aperture_sum','mag', 'magnitude', 5)
 #boostFactorDep('mag', 'magnitude GEMS', 5)
 #boostFactorDep('r_half', 'half light radius GEMS [arcsec]', 5)
 
-e1_s = []
+# e1_s = []
 
 # path = config.workpath('Run1/PSF_es_1/Measured_ksb.fits')
 # table1 = Table.read(path)
@@ -196,13 +281,13 @@ e1_s = []
 # # AS = 24.6 - 2.5 * np.log10(3.1/(3*565)* AS)
 # plt.hist(AS, 10)                          
 
-path = config.workpath('Run6/PSF_es_1/Measured_ksb.fits')
-table = Table.read(path)
-Good = table['sigma_mom'] > 0
-plt.scatter(table['r_half'][Good], table['sigma_mom'][Good], s=2)
-plt.xlabel('half light radius GEMS [arcsec]')
-plt.ylabel('sigma moment')
-plt.savefig('Plots2/r_half_sigma_mom.pdf')
+# path = config.workpath('Run6/PSF_es_1/Measured_ksb.fits')
+# table = Table.read(path)
+# Good = table['sigma_mom'] > 0
+# plt.scatter(table['r_half'][Good], table['sigma_mom'][Good], s=2)
+# plt.xlabel('half light radius GEMS [arcsec]')
+# plt.ylabel('sigma moment')
+# plt.savefig('Plots2/r_half_sigma_mom.pdf')
 
 #smear polarizability in dependence on magnitude
 # bsm = np.linspace(1,1.4,8)

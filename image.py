@@ -59,6 +59,7 @@ def generate_realisations(path_table, path, case):
     n_cas = table.meta['N_CAS']
     # print(table['bound_y_bottom'])
     pixel_scale = 0.1 #arcsec/pixel
+    pixel_scale_small = 0.02
     mag_sky = 22.35
     gain = 3.1 #e/ADU
     gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize*n_cas-1, scale = pixel_scale)
@@ -68,9 +69,17 @@ def generate_realisations(path_table, path, case):
     count = 0
     count1 = 0
     for Galaxy in table:
-        if count%100==0:
+        psf_image = galsim.ImageF(stamp_xsize, stamp_ysize, scale = pixel_scale_small)
+        psf1 = psf.shear(e1 = Galaxy['psf_pol'])
+        psf1.drawImage(psf_image)
+        file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
+        psf_image.write(file_name)
+        break
+    for Galaxy in table:
+        gal2 = galsim.ImageF(stamp_xsize - 1, stamp_ysize -1, scale = pixel_scale)
+        gal_blank = galsim.ImageF(stamp_xsize - 1, stamp_ysize -1, scale = pixel_scale)
+        if count%1000==0:
             print(count, case)
-        noise = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize*n_cas-1, scale = pixel_scale)
         Sky_flux = sky_flux(mag_sky)
         psf = psf.shear(e1 = Galaxy['psf_pol'])
         flux = gal_flux(Galaxy['mag'])
@@ -81,25 +90,28 @@ def generate_realisations(path_table, path, case):
         #create grid
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
         sub_gal_image = gal_image[b] 
-        sub_noise_image = noise[b]
         #shift galaxies and psfs on the grid
         gal = gal.shift(Galaxy['pixel_shift_x'], Galaxy['pixel_shift_y'])
         #shear galaxy
         gal = gal.shear(g1 = Galaxy['gamma1'])
         #convolve galaxy and psf 
         final_gal = galsim.Convolve([psf,gal], gsparams = gs)
-        final_gal.drawImage(sub_gal_image)
         #add noise
         if Galaxy['pixel_noise'] == 0:
+            final_gal.drawImage(sub_gal_image)
             rng = galsim.BaseDeviate(random_seed + count1)
             CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
             sub_gal_image.addNoise(CCD_Noise)
         else:
+            final_gal.drawImage(gal2)
+            final_gal.drawImage(gal_blank)
             rng = galsim.BaseDeviate(random_seed + count1)
             CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
-            sub_noise_image.addNoise(CCD_Noise)
-            sub_noise_image = -1*sub_noise_image 
-            sub_gal_image = sub_gal_image + sub_noise_image
+            gal2.addNoise(CCD_Noise)
+            Diff = gal2.array - gal_blank.array
+            gal_minus = np.subtract(gal_blank.array,Diff)
+            gal_image[b] = galsim.Image(gal_minus)
+            #print(sub_gal_image)
             count1 = count1 + 1
         #sub_gal_image.addNoise(CCD_Noise)
         count = count + 1
@@ -113,7 +125,7 @@ def generate_realisations(path_table, path, case):
     
 
 # path = config.workpath('Test/')
-# generate_realisations(path + 'Input_data.fits', path, 9)
+# generate_realisations(path + 'Input_data.fits', path, 0)
 
 def generate_image(path_table, path):
     log_format = '%(asctime)s %(filename)s: %(message)s'
