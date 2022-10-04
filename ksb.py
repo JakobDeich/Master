@@ -219,14 +219,14 @@ def calculate_ksb(path):
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
-def calculate_ksb_training(path):
+def calculate_ksb_training(path, case):
     sigw_sub = 10 
     path = config.workpath(path)
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
-    table = Table.read(path + '/Input_data.fits')
+    table = Table.read(path + '/Input_data_' + str(case) + '.fits')
     logging.info('Read in table from %s /table.fits' %path)
-    image_file = path + '/Grid.fits'
+    image_file = path + '/Grid_case' + str(case) + '.fits'
     gal_image = galsim.fits.read(image_file)
     stamp_x_size = table.meta['STAMP_X']
     stamp_y_size = table.meta['STAMP_Y']
@@ -238,17 +238,17 @@ def calculate_ksb_training(path):
     tab6 = []
     tab7 = []
     tab8 = []
+    PSF = galsim.fits.read(path + '/PSF_' + str(case) + '.fits')
+    meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
     logging.info('start ksb algorithm')
     count = 0
     positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
     aperture = CircularAperture(positions, r=sigw_sub)
     for Galaxy in table:        
-        if count%1000==0:
+        if count%100==0:
             logging.warning('Galaxy number %i' %count)
             print(str(count) + ' Galaxies examined')
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
-        PSF = galsim.fits.read(path + '/PSF_' + str(Galaxy['n_case']) + '.fits')
-        meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
         sub_gal_image = gal_image[b] 
         sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
         meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = sigw_sub)
@@ -297,7 +297,7 @@ def calculate_ksb_training(path):
         table.replace_column(name = 'sigma_mom', col = Col_G)
         table.replace_column(name = 'rho4_mom', col = Col_H)
         logging.info('replaced columns in table')
-    table.write( path + '/Measured_ksb.fits' , overwrite=True) 
+    table.write( path + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 

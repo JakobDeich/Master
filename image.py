@@ -55,8 +55,6 @@ def generate_realisations(path_table, path, case):
     stamp_ysize = table.meta['STAMP_Y']
     n_rea = table.meta['N_REA']
     n_canc = table.meta['N_CANC']
-    table = table[n_rea*n_canc*case:n_rea*n_canc*(case+1)]
-    n_cas = table.meta['N_CAS']
     # print(table['bound_y_bottom'])
     pixel_scale = 0.1 #arcsec/pixel
     pixel_scale_small = 0.02
@@ -65,6 +63,7 @@ def generate_realisations(path_table, path, case):
     gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize-1, scale = pixel_scale)
     #define optical psf with Euclid condition and anisotropy
     psf = generate_psf()
+    psf = psf.shear(e1 = table['psf_pol'][0])
     #creating the grid and placing galaxies on it
     count = 0
     count1 = 0
@@ -78,10 +77,9 @@ def generate_realisations(path_table, path, case):
     for Galaxy in table:
         gal2 = galsim.ImageF(stamp_xsize - 1, stamp_ysize -1, scale = pixel_scale)
         gal_blank = galsim.ImageF(stamp_xsize - 1, stamp_ysize -1, scale = pixel_scale)
-        if count%1000==0:
+        if count%200==0:
             print(count, case)
         Sky_flux = sky_flux(mag_sky)
-        psf = psf.shear(e1 = Galaxy['psf_pol'])
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
@@ -123,9 +121,10 @@ def generate_realisations(path_table, path, case):
     
 
     
-
 # path = config.workpath('Test/')
-# generate_realisations(path + 'Input_data.fits', path, 0)
+# # # tab.training_set_tab(5, 10, 1, 10, 64, 64, path)
+# # # bounds = table['bound_x_left']
+# generate_realisations(path + 'Input_data_0.fits', path, 0)
 
 def generate_image(path_table, path):
     log_format = '%(asctime)s %(filename)s: %(message)s'
@@ -176,15 +175,19 @@ def generate_image(path_table, path):
         gal = gal.shear(g1 = gamma1, g2 = gamma2)
         #convolve galaxy and psf 
         final_gal = galsim.Convolve([psf,gal], gsparams = gs)
-        try:
-            final_gal.drawImage(sub_gal_image)
-        except:
-            print('Error at galaxy ', count)
-            logging.error('Error at galaxy %d with elipticities e1 = %f and e2 = %f' %(count, Galaxy['e1'], Galaxy['e2']))
+        # try:
+        #     final_gal.drawImage(sub_gal_image)
+        # except:
+        #     print('Error at galaxy ', count)
+        #     logging.error('Error at galaxy %d with elipticities e1 = %f and e2 = %f' %(count, Galaxy['e1'], Galaxy['e2']))
         #add noise
+        start1 = time.time()
+        final_gal.drawImage(sub_gal_image)
         rng = galsim.BaseDeviate(random_seed + count)
         CCD_Noise = galsim.CCDNoise(rng, sky_level = sky_flux, gain = gain, read_noise = 4.2)
         sub_gal_image.addNoise(CCD_Noise)
+        end1 = time.time()
+        print(end1-start1)
         count = count + 1
     logging.info('finished generating grid')
     if not os.path.isdir(path):
@@ -194,8 +197,12 @@ def generate_image(path_table, path):
     logging.info('Grid saved in File at %s/Grid.fits' %path)
     return None
 
-#generate_image('Test/Input_data.fits', 'Test')
-#generate_psf_image('Test')
+
+# path = config.workpath('Test/')
+# table = Table.read(path + '/Input_data_0.fits')
+# print(table[500])
+# table2 = Table.read('Test/Gamma.fits')
+# print(table2)
 
 end = time.time()
 

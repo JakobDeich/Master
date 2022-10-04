@@ -24,7 +24,7 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, 
     random_seed = 15783
     rng = np.random.default_rng()
     rotation = np.linspace(0, 180, n_rot, endpoint= False)
-    shear = np.linspace(-0.6,0.6,n_shear)
+    shear = np.linspace(-0.06,0.06,n_shear)
     values = []
     count1 = 0
     for i in range(n_shear):
@@ -71,6 +71,8 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, pat
         psf_pol = rng.choice(psf_pols, 1)
         mag = case['mag']
         n_sersic = case['n']
+        tru_sersicns = np.linspace(0.3, 6.0, 21)
+        n_sersic= tru_sersicns[(np.abs(tru_sersicns-n_sersic)).argmin()]
         r_half = case['r_half']
         params = [n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, n_sersic, r_half, psf_pol, count, path]
         final.append(params)

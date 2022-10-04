@@ -9,7 +9,7 @@ import logging
 import time
 import ksb
 import config
-from astropy.table import Table
+from astropy.table import Table, vstack
 
 start = time.time()
 
@@ -24,6 +24,14 @@ def generate_sim_trainingSet(path, case):
         final.append(params)
     with Pool() as pool:
         pool.starmap(image.generate_realisations, final)
+    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
+    for i in range(case):
+        table1 = Table.read(mydir + 'Input_data'+ str(i) + '.fits')
+        table = vstack([table,table1]) 
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    file_name = os.path.join(path, 'Input_data.fits')
+    table.write( file_name , overwrite=True) 
     return None
 
 #generate_sim_trainingSet('Test', 4)    
