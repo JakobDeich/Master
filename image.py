@@ -59,8 +59,9 @@ def generate_realisations(path_table, path, case):
     pixel_scale = 0.1 #arcsec/pixel
     pixel_scale_small = 0.02
     mag_sky = 22.35
+    Sky_flux = sky_flux(mag_sky)
     gain = 3.1 #e/ADU
-    gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1)+1, stamp_ysize-1, scale = pixel_scale)
+    gal_image = galsim.ImageF((stamp_xsize *n_canc*n_rea-1), stamp_ysize-1, scale = pixel_scale)
     #define optical psf with Euclid condition and anisotropy
     psf = generate_psf()
     psf = psf.shear(e1 = table['psf_pol'][0])
@@ -69,8 +70,7 @@ def generate_realisations(path_table, path, case):
     count1 = 0
     for Galaxy in table:
         psf_image = galsim.ImageF(stamp_xsize, stamp_ysize, scale = pixel_scale_small)
-        psf1 = psf.shear(e1 = Galaxy['psf_pol'])
-        psf1.drawImage(psf_image)
+        psf.drawImage(psf_image)
         file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
         psf_image.write(file_name)
         break
@@ -79,7 +79,6 @@ def generate_realisations(path_table, path, case):
         gal_blank = galsim.ImageF(stamp_xsize - 1, stamp_ysize -1, scale = pixel_scale)
         if count%200==0:
             print(count, case)
-        Sky_flux = sky_flux(mag_sky)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
@@ -122,8 +121,8 @@ def generate_realisations(path_table, path, case):
 
     
 # path = config.workpath('Test/')
-# # # tab.training_set_tab(5, 10, 1, 10, 64, 64, path)
-# # # bounds = table['bound_x_left']
+# # # # tab.training_set_tab(5, 10, 1, 10, 64, 64, path)
+# # # # bounds = table['bound_x_left']
 # generate_realisations(path + 'Input_data_0.fits', path, 0)
 
 def generate_image(path_table, path):

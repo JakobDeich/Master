@@ -132,7 +132,31 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
                 ksbpar['Psh12']=psh12
                 return ksbpar
    
-            
+path = config.workpath('Test')
+table = Table.read(path + '/Input_data_8.fits')
+PSF = galsim.fits.read(path + '/PSF_8.fits')
+meas_on_psf = ksb_moments(PSF.array, sigw = 10)
+print(table['psf_pol'])
+image_file = path + '/Grid_case8.fits'
+gal_image = galsim.fits.read(image_file)
+a = []
+c = []
+for Galaxy in table:
+    if Galaxy['pixel_noise']==1:
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+        sub_gal_image = gal_image[b] 
+        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+        meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = 10)
+        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+        a.append(meas_on_galaxy['e1'])
+    else:
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+        sub_gal_image = gal_image[b] 
+        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+        meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = 10)
+        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+        c.append(meas_on_galaxy['e1'])
+print(len(a), len(c))        
     # e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
     # e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
 def calculate_ksb(path):
@@ -303,14 +327,13 @@ def calculate_ksb_training(path, case):
 
 
 def calculate_ksb_galsim(path):
-    image.generate_psf_image(path)
-    PSF = galsim.fits.read(path + '/PSF.fits')
+    PSF = galsim.fits.read(path + '/PSF_5.fits')
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='ksb_galsim.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     # table = Table.read(path + '/table.fits')
-    table = Table.read(path + '/Input_data.fits')
+    table = Table.read(path + '/Input_data_5.fits')
     logging.info('Read in table from %s /table.fits' %path)
-    image_file = path + '/Grid.fits'
+    image_file = path + '/Grid_case5.fits'
     gal_image = galsim.fits.read(image_file)
     # ny = table.meta['NY_TILES']
     # nx = table.meta['NX_TILES']
@@ -334,7 +357,6 @@ def calculate_ksb_galsim(path):
             tab2.append(results.observed_shape._g.real)
             tab3.append(results.observed_shape._g.imag)
             tab4.append(0)
-            
         except:
             n_fail += 1
             tab5.append(-10)
@@ -345,21 +367,19 @@ def calculate_ksb_galsim(path):
     Col_A = Column(name='g1_cal_galsim', data=tab2)
     Col_B = Column(name='g2_cal_galsim', data=tab3)
     Col_C = Column(name='Cal_succesful', data=tab4)
-    Col_D = Column(name= 'e1_galsim', data = tab)
     print(n_fail)
     try:
-        table.add_columns([Col_A, Col_B, Col_C, Col_D])
+        table.add_columns([Col_A, Col_B, Col_C])
         logging.info('Add columns to table')
     except:
         table.replace_column(name = 'g1_cal_galsim', col = Col_A)
         table.replace_column(name = 'g2_cal_galsim', col = Col_B)
         table.replace_column(name = 'Cal_succesful', col = Col_C)
-        table.replace_column(name = 'e1_galsim', col = Col_D)
         logging.info('replaced columns in table')
     table.write( path + '/Measured_galsim.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1 and e2')
     return None
-# mydir = config.workpath('Test_1')
+# mydir = config.workpath('Test')
 # calculate_ksb_galsim(mydir)
 
 # mydir = config.workpath('Run1/PSF_es_1')

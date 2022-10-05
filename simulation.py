@@ -9,6 +9,7 @@ import logging
 import time
 import ksb
 import config
+import analyze
 from astropy.table import Table, vstack
 
 start = time.time()
@@ -26,14 +27,35 @@ def generate_sim_trainingSet(path, case):
         pool.starmap(image.generate_realisations, final)
     table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
     for i in range(case):
-        table1 = Table.read(mydir + 'Input_data'+ str(i) + '.fits')
+        table1 = Table.read(mydir + '/Input_data_'+ str(i) + '.fits')
         table = vstack([table,table1]) 
-    if not os.path.isdir(path):
-        os.mkdir(path)
-    file_name = os.path.join(path, 'Input_data.fits')
+    if not os.path.isdir(mydir):
+        os.mkdir(mydir)
+    file_name = os.path.join(mydir, 'Input_data.fits')
     table.write( file_name , overwrite=True) 
     return None
 
+
+def ksb_and_boost(path, case):
+    mydir = config.workpath(path)
+    cases = np.arange(case)
+    final = []
+    for i in range(case):
+        params = [mydir, cases[i]]
+        final.append(params)
+    with Pool() as pool:
+        pool.starmap(ksb.calculate_ksb_training, final)
+    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
+    for i in range(case):
+        table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')
+        table = vstack([table,table1]) 
+    if not os.path.isdir(mydir):
+        os.mkdir(mydir)
+    file_name = os.path.join(mydir, 'Measured_ksb.fits')
+    table.write( file_name , overwrite=True) 
+    with Pool() as pool:
+        pool.starmap(analyze.determine_boost, final)
+    return None
 #generate_sim_trainingSet('Test', 4)    
 
 

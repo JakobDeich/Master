@@ -14,41 +14,84 @@ start = time.time()
 
 def linear(x, m, b):
     return m*x + b
+# b = 1.2
+# gamma_cal = []
+# gamma_real = np.linspace(-0.1,0.1,20)
+# for i in range(20):
+#     path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+#     table = Table.read(path)
+#     e1 = table['e1_cal']
+#     e_corr = table['anisotropy_corr']
+#     print(e_corr)
+#     P_g11 = table['Pg_11']
+#     mean1 = np.mean(e1-b*e_corr)
+#     mean2 = np.mean(P_g11)
+#     gamma_cal.append(mean1/mean2)
+# popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
+# #plt.scatter(gamma_real, gamma_cal)
+# print(popt[1])
+
+
+
+# shear = np.linspace(-0.06, 0.06, 5)
+# gamma_cal = []
+# gamma_real = np.linspace(-0.06, 0.06, 5)
+# for j in shear:
+#     g1 = []
+#     for Galaxy in table:
+#         if (Galaxy['gamma1']-10**(-4)) <= j and (Galaxy['gamma1']+10**(-4)) >= j:
+#             param = Galaxy['g1_cal_galsim']
+#             g1.append(param)
+#     g1 = np.asarray(g1)
+#     mean1 = np.mean(g1)
+#     gamma_cal.append(mean1)
+# popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
+# plt.scatter(gamma_real, gamma_cal)
+# plt.show()
+    
 
 
 def determine_boost(path, case):
     print('determining boost factor for case ' + str(case))
     mydir = config.workpath(path)
     table = Table.read(mydir + '/Measured_ksb_' + str(case) + '.fits')
-    cancellations = table.meta['N_CANC']
-    realisations = table.meta['N_REA']
-    Case = cancellations * realisations
-    cases = table.meta['N_CAS']
+    for Galaxy in table:
+        print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'])
+        break
     shears = table.meta['N_SHEAR']
     shear = np.linspace(-0.06, 0.06, shears)
     bs_real = []
-    bsm = np.linspace(1.1,1.4,3)
+    bsm = np.linspace(1.,1.4,3)
     gamma_real = np.linspace(-0.06, 0.06, shears)
+    gamma_real2 = np.linspace(-0.06, 0.06, 100)
     cs = []
     for b in bsm:
         gamma_cal = []
         for j in shear:
-            Params = []
+            e_corr = []
+            P_g11 = []
+            e1 = []
             for Galaxy in table:
                 if (Galaxy['gamma1']-10**(-4)) <= j and (Galaxy['gamma1']+10**(-4)) >= j:
-                    params = [Galaxy['e1_cal'], Galaxy['anisotropy_corr'], Galaxy['Pg_11']]
-                    Params.append(params)
-            e1 = np.asarray(Params)[:,0]
-            e_corr = np.asarray(Params)[:,1]
-            P_g11 = np.asarray(Params)[:,2]
-            mean1 = np.mean(e1-b * e_corr)
+                    param = Galaxy['e1_cal']
+                    e1.append(param)
+                    param = Galaxy['anisotropy_corr']
+                    e_corr.append(param)
+                    param = Galaxy['Pg_11']
+                    P_g11.append(param)
+            e1 = np.asarray(e1)
+            e_corr = np.asarray(e_corr)
+            P_g11 = np.asarray(P_g11)
+            mean1 = np.mean(e1- b * e_corr)
             mean2 = np.mean(P_g11)
             gamma_cal.append(mean1/mean2)
         popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
-        # plt.scatter(gamma_real, gamma_cal)
-        # plt.show()
+        plt.scatter(gamma_real, gamma_cal)
         bias = popt[1]
+        #plt.scatter(gamma_real, gamma_cal)
+        plt.plot(gamma_real2, linear(gamma_real2, popt[0], bias))
         cs.append(bias) 
+        print(bias)
     popt, pcov = curve_fit(linear, bsm, cs)
     m2 = popt[0]
     b2 = popt[1]
@@ -57,7 +100,7 @@ def determine_boost(path, case):
     return None
 
     
-# determine_boost('Test', 2)
+determine_boost('Test',7)
 
 def Bootstrap_boost(table,bin_digit,bin_num, b):
     Error = 0

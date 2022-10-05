@@ -27,7 +27,11 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 # simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
 
 
-simulation.generate_sim_trainingSet('Test', 100)
+# simulation.generate_sim_trainingSet('Test', 100)
+# simulation.ksb_and_boost('Test', 100)
+rotation = np.linspace(0, 180, 11)
+print(rotation)
+
 # for i in range(100):
 #     ksb.calculate_ksb_training('Test', i)
 #     analyze.determine_boost('Test', i)
