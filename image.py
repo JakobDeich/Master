@@ -89,6 +89,7 @@ def generate_realisations(path_table, path, case):
         sub_gal_image = gal_image[b] 
         #shift galaxies and psfs on the grid
         gal = gal.shift(Galaxy['pixel_shift_x'], Galaxy['pixel_shift_y'])
+        gal = gal.rotate(galsim.Angle(theta = Galaxy['rotation'], unit = coord.degrees))
         #shear galaxy
         gal = gal.shear(g1 = Galaxy['gamma1'])
         #convolve galaxy and psf 
@@ -109,7 +110,8 @@ def generate_realisations(path_table, path, case):
             gal_minus = np.subtract(gal_blank.array,Diff)
             gal_image[b] = galsim.Image(gal_minus)
             #print(sub_gal_image)
-            count1 = count1 + 1
+            if count%n_canc==0:
+                count1 = count1 + 1
         #sub_gal_image.addNoise(CCD_Noise)
         count = count + 1
     if not os.path.isdir(path):

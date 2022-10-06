@@ -8,12 +8,16 @@ from matplotlib import cm
 from scipy.optimize import curve_fit
 from astropy.table import Table
 import os
+from astropy.table import Table, Column
 import time
 
 start = time.time()
 
 def linear(x, m, b):
     return m*x + b
+
+def gal_mag(flux):
+    return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
 # b = 1.2
 # gamma_cal = []
 # gamma_real = np.linspace(-0.1,0.1,20)
@@ -48,17 +52,18 @@ def linear(x, m, b):
 # popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
 # plt.scatter(gamma_real, gamma_cal)
 # plt.show()
-    
 
 
 def determine_boost(path, case):
     print('determining boost factor for case ' + str(case))
     mydir = config.workpath(path)
     table = Table.read(mydir + '/Measured_ksb_' + str(case) + '.fits')
-    for Galaxy in table:
-        print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'])
-        break
+    # for Galaxy in table:
+    #     print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'], gal_mag(Galaxy['aperture_sum']))
+    #     break
     shears = table.meta['N_SHEAR']
+    n_rea = table.meta['N_REA']
+    n_canc = table.meta['N_CANC']
     shear = np.linspace(-0.06, 0.06, shears)
     bs_real = []
     bsm = np.linspace(1.,1.4,3)
@@ -86,21 +91,34 @@ def determine_boost(path, case):
             mean2 = np.mean(P_g11)
             gamma_cal.append(mean1/mean2)
         popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
-        plt.scatter(gamma_real, gamma_cal)
+        # plt.scatter(gamma_real, gamma_cal)
         bias = popt[1]
-        #plt.scatter(gamma_real, gamma_cal)
-        plt.plot(gamma_real2, linear(gamma_real2, popt[0], bias))
+        # plt.scatter(gamma_real, gamma_cal)
+        # plt.plot(gamma_real2, linear(gamma_real2, popt[0], bias))
         cs.append(bias) 
-        print(bias)
     popt, pcov = curve_fit(linear, bsm, cs)
     m2 = popt[0]
     b2 = popt[1]
     bs_real.append(-1*b2/m2)
-    print(bs_real)
+    tab = np.ones(n_rea*n_canc)*(-1*b2/m2)
+    Col_A = Column(name = 'b_sm', data = tab)
+    try:
+        table.add_columns([Col_A])
+    except:
+        table.replace_column(name = 'b_sm', col = Col_A)
+    table.write( mydir + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
     return None
 
     
-determine_boost('Test',7)
+# determine_boost('Test2',2)
+# mydir = config.workpath('Test2')
+# table = Table.read(mydir + '/Measured_ksb.fits')
+# print(table['b_sm'])
+# plt.hist(table['b_sm'], bins = 60, range= (0.5,3), density = True)
+# plt.xlabel('boost factor $b_{sm}$')
+# plt.ylabel('Percentage of total counts')
+# plt.savefig('Histo_boost_ex.pdf')
+
 
 def Bootstrap_boost(table,bin_digit,bin_num, b):
     Error = 0
