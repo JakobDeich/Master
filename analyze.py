@@ -18,21 +18,38 @@ def linear(x, m, b):
 
 def gal_mag(flux):
     return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
-# b = 1.2
-# gamma_cal = []
-# gamma_real = np.linspace(-0.1,0.1,20)
-# for i in range(20):
-#     path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
-#     table = Table.read(path)
-#     e1 = table['e1_cal']
-#     e_corr = table['anisotropy_corr']
-#     print(e_corr)
-#     P_g11 = table['Pg_11']
-#     mean1 = np.mean(e1-b*e_corr)
-#     mean2 = np.mean(P_g11)
-#     gamma_cal.append(mean1/mean2)
-# popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
-# #plt.scatter(gamma_real, gamma_cal)
+
+
+b = 1
+gamma_cal = []
+gamma_real = np.linspace(-0.1,0.1,20)
+bsm = np.linspace(1,1.4,4)
+cs = []
+for b in bsm:
+    gamma_cal = []
+    for i in range(20):
+        path = config.workpath('Run6/PSF_es_' + str(i+1) +'/Measured_ksb.fits')
+        table = Table.read(path)
+        e1 = table['e1_cal']
+        e_corr = table['anisotropy_corr']
+        P_g11 = table['Pg_11']
+        mean1 = np.mean(e1-b*e_corr)
+        mean2 = np.mean(P_g11)
+        gamma_cal.append(mean1/mean2 - gamma_real[i])
+    popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
+    # plt.scatter(gamma_real, gamma_cal, label = '$b^{sm}_1$ = ' + str(b) + ' , $\mu_1$ = ' + str(round(popt[0], 4)) + ' , $c_1$ = ' + str(round(popt[1], 4)))
+    # plt.plot(gamma_real, linear(gamma_real, popt[0], popt[1]))
+    cs.append(popt[1]) 
+popt, pcov = curve_fit(linear, bsm, cs)
+plt.scatter(bsm, cs)
+plt.plot(bsm, linear(bsm, popt[0], popt[1]))
+m2 = popt[0]
+b2 = popt[1]
+plt.scatter(-1*b2/m2, 0, s = 80, color = 'r', marker = 'D',label = 'target boost factor')    
+plt.xlabel('boost factor $b^{sm}_1$')
+plt.ylabel('additive bias $c_1$')
+plt.legend()
+plt.savefig('Plots2/Boost_determine_Schema.pdf')
 # print(popt[1])
 
 
@@ -111,13 +128,17 @@ def determine_boost(path, case):
 
     
 # determine_boost('Test2',2)
-# mydir = config.workpath('Test2')
+# mydir = config.workpath('Test')
 # table = Table.read(mydir + '/Measured_ksb.fits')
-# print(table['b_sm'])
-# plt.hist(table['b_sm'], bins = 60, range= (0.5,3), density = True)
+# # print(table)
+# b = table['b_sm']
+# m = table['mag']
+# r = table['r_half']
+# n = table['n']
+# plt.hist(table['b_sm'], bins = 50, range= (0.2,2.4), density = True)
 # plt.xlabel('boost factor $b_{sm}$')
 # plt.ylabel('Percentage of total counts')
-# plt.savefig('Histo_boost_ex.pdf')
+# plt.savefig('Plots2/Histo_boost_new.pdf')
 
 
 def Bootstrap_boost(table,bin_digit,bin_num, b):

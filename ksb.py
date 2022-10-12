@@ -132,31 +132,31 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
                 ksbpar['Psh12']=psh12
                 return ksbpar
    
-path = config.workpath('Test')
-table = Table.read(path + '/Input_data_8.fits')
-PSF = galsim.fits.read(path + '/PSF_8.fits')
-meas_on_psf = ksb_moments(PSF.array, sigw = 10)
-print(table['psf_pol'])
-image_file = path + '/Grid_case8.fits'
-gal_image = galsim.fits.read(image_file)
-a = []
-c = []
-for Galaxy in table:
-    if Galaxy['pixel_noise']==1:
-        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
-        sub_gal_image = gal_image[b] 
-        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
-        meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = 10)
-        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
-        a.append(meas_on_galaxy['e1'])
-    else:
-        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
-        sub_gal_image = gal_image[b] 
-        sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
-        meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = 10)
-        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
-        c.append(meas_on_galaxy['e1'])
-print(len(a), len(c))        
+# path = config.workpath('Test')
+# table = Table.read(path + '/Input_data_8.fits')
+# PSF = galsim.fits.read(path + '/PSF_8.fits')
+# meas_on_psf = ksb_moments(PSF.array, sigw = 10)
+# print(table['psf_pol'])
+# image_file = path + '/Grid_case8.fits'
+# gal_image = galsim.fits.read(image_file)
+# a = []
+# c = []
+# for Galaxy in table:
+#     if Galaxy['pixel_noise']==1:
+#         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+#         sub_gal_image = gal_image[b] 
+#         sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+#         meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = 10)
+#         e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+#         a.append(meas_on_galaxy['e1'])
+    # else:
+    #     b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+    #     sub_gal_image = gal_image[b] 
+    #     sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+    #     meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = 10)
+    #     e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+    #     c.append(meas_on_galaxy['e1'])
+# print(len(a), len(c))        
     # e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
     # e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
 def calculate_ksb(path):
@@ -269,9 +269,9 @@ def calculate_ksb_training(path, case):
     positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
     aperture = CircularAperture(positions, r=sigw_sub)
     for Galaxy in table:        
-        if count%100==0:
+        if count%2000==0:
             logging.warning('Galaxy number %i' %count)
-            print(str(count) + ' Galaxies examined')
+            print(str(count) + ' Galaxies examined in case ' + str(case))
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
         sub_gal_image = gal_image[b] 
         sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)

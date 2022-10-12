@@ -5,6 +5,8 @@ import time
 import os
 import ksb
 import analyze
+import tab
+import image
 from multiprocessing import Pool
 
 start = time.time()
@@ -27,9 +29,12 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 # simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
 
 
-#simulation.generate_sim_trainingSet('Test2', 100)
-simulation.ksb_and_boost('Test2', 100)
+simulation.generate_sim_trainingSet('Test', 200)
+simulation.ksb_and_boost('Test', 200)
 
+# path = config.workpath('Example')
+# tab.tab_realisation(1, 1, 1, 1, 64, 64, 350, 350, 22, 1, 1.2, 0.03, 666, path)
+# image.generate_realisations(path + '/Input_data_666.fits', path, 666)
 
 # for i in range(100):
 #     ksb.calculate_ksb_training('Test', i)

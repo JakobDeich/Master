@@ -16,7 +16,7 @@ start = time.time()
 
 def generate_sim_trainingSet(path, case):
     mydir =config.workpath(path)
-    tab.training_set_tab(5, 10, case, 5, 64, 64, mydir)
+    tab.training_set_tab(5, 20, case, 50, 64, 64, 350, 350, mydir)
     cases = np.arange(case)
     #gal_image = []
     final = []
@@ -43,8 +43,8 @@ def ksb_and_boost(path, case):
     for i in range(case):
         params = [mydir, cases[i]]
         final.append(params)
-    # with Pool() as pool:
-    #     pool.starmap(ksb.calculate_ksb_training, final)
+    with Pool() as pool:
+        pool.starmap(ksb.calculate_ksb_training, final)
     with Pool() as pool:
         pool.starmap(analyze.determine_boost, final)
     table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'])

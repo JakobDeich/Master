@@ -18,21 +18,21 @@ def trunc_rayleigh(sigma, max_val):
         tmp = np.random.rayleigh(sigma)
     return tmp
 
-def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, n_sersic, r_half, psf_pol, case, path):
+def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, psf_pol, case, path):
     print('case ' + str(case) + ' building table')
-    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'rotation', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize})
+    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'rotation', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'psf_x': psf_stamp_x, 'psf_y': psf_stamp_y})
     random_seed = 15783
     rng = np.random.default_rng()
     rotation = np.linspace(0, 180, n_rot, endpoint= False)
-    shear = np.linspace(-0.06,0.06,n_shear)
+    shear = np.linspace(-0.06,0.06 ,n_shear)
     values = []
     count1 = 0
     for i in range(n_shear):
         for j in range(n_rot):
             for k in range(2):
-                params = [shear[i],rotation[j],count1*stamp_xsize + 1, (count1+1)*stamp_xsize-1, k] 
+                params = [shear[i],rotation[j],k*n_rot*stamp_ysize+j*stamp_xsize + 1, k*n_rot*stamp_ysize+(j+1)*stamp_xsize-1,  i*stamp_ysize + 1, (i+1)*stamp_ysize - 1, k] 
                 values.append(params)
-                count1 = count1 + 1
+            count1 = count1 + 1
     count = 0
     n_canc = n_shear*n_rot*2
     for realisation in range(n_rea):
@@ -44,7 +44,7 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, 
         for Cancellation in values:
             e1 = e_betrag*np.cos(2*phi) 
             e2 = e_betrag*np.sin(2*phi)
-            params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, realisation*stamp_xsize*n_canc + Cancellation[2], realisation*stamp_xsize*n_canc + Cancellation[3], 1, stamp_ysize-1, dx, dy,Cancellation[1], Cancellation[4]]
+            params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, Cancellation[2], Cancellation[3], realisation*stamp_ysize*n_shear + Cancellation[4], realisation*stamp_ysize*n_shear + Cancellation[5], dx, dy,Cancellation[1], Cancellation[6]]
             table.add_row(params)
         count = count + 1
     if not os.path.isdir(path):
@@ -54,16 +54,20 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, 
     print('case ' + str(case) + ' finished table')
     return None
 
-def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, path):
+
+def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, path):
     cat = galsim.Catalog('gems_20090807.fits')
     tab = Table(names = ['mag', 'n', 'r_half'], dtype = ['f4', 'f4', 'f4'])
     for i in range(cat.nobjects):
-        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (21.5 < cat.get(i, 'ST_MAG_GALFIT') < 23.0) and (1. < cat.get(i, 'ST_N_GALFIT') < 3.5) and (8.0 < cat.get(i, 'ST_RE_GALFIT') <30.0)):
+        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 25.0) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 6.0) and (3.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
             params = [cat.get(i, 'ST_MAG_GALFIT'), cat.get(i, 'ST_N_GALFIT'), cat.get(i, 'ST_RE_GALFIT')*0.03]
             tab.add_row(params)
     rng = np.random.default_rng()
     tab_random = rng.choice(tab, size = n_cas)
-    psf_pols = np.linspace(-0.1,0.1,100)
+    psf_pol_limit = 0.01
+    psf_pols = np.linspace(psf_pol_limit,0.1,100)
+    psf_pols1 = np.linspace(-0.1,psf_pol_limit,100)
+    psf_pols = np.concatenate((psf_pols, psf_pols1))
     final = []
     count = 0
     for case in tab_random:
@@ -73,17 +77,19 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, pat
         tru_sersicns = np.linspace(0.3, 6.0, 21)
         n_sersic= tru_sersicns[(np.abs(tru_sersicns-n_sersic)).argmin()]
         r_half = case['r_half']
-        params = [n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, mag, n_sersic, r_half, psf_pol, count, path]
+        params = [n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, psf_pol, count, path]
         final.append(params)
         count = count + 1
     with Pool() as pool:
             pool.starmap(tab_realisation, final)
     return None
 
-# training_set_tab(2, 2, 4, 3, 64, 64, 'Test')
-# path = config.workpath('Test2')
-# table = Table.read(path + '/Input_data_3.fits')
-# mag = table['mag']
+
+# path = config.workpath('Test')
+# training_set_tab(2, 1, 1, 3, 64, 64,350, 350,  path)
+# table = Table.read(path + '/Input_data_0.fits')
+# pn = table['pixel_noise']
+# print(pn)
 # # bound1 = table['bound_x_left']
 # ns = table['n']
 # psf = table['psf_pol']
