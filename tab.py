@@ -11,17 +11,17 @@ import config
 from multiprocessing import Pool
 #import numpy.random.Generator
 
-def trunc_rayleigh(sigma, max_val):
+def trunc_rayleigh(sigma, max_val, case):
+    np.random.seed(case)
     assert max_val > sigma
     tmp = max_val + 1
     while tmp > max_val:
         tmp = np.random.rayleigh(sigma)
     return tmp
-
 def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, psf_pol, case, path):
     print('case ' + str(case) + ' building table')
     table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'rotation', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'psf_x': psf_stamp_x, 'psf_y': psf_stamp_y})
-    random_seed = 15783
+    random_seed = 15783 + case
     rng = np.random.default_rng()
     rotation = np.linspace(0, 180, n_rot, endpoint= False)
     shear = np.linspace(-0.06,0.06 ,n_shear)
@@ -39,7 +39,7 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_s
         ud = galsim.UniformDeviate(random_seed + count + 1)
         dx = (2*ud()-1) * 0.1/2
         dy = (2*ud()-1) * 0.1/2
-        e_betrag = trunc_rayleigh(0.25, 0.7)
+        e_betrag = trunc_rayleigh(0.25, 0.7, case)
         phi = rng.choice(180)
         for Cancellation in values:
             e1 = e_betrag*np.cos(2*phi) 
@@ -66,7 +66,7 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, psf
     tab_random = rng.choice(tab, size = n_cas)
     psf_pol_limit = 0.01
     psf_pols = np.linspace(psf_pol_limit,0.1,100)
-    psf_pols1 = np.linspace(-0.1,psf_pol_limit,100)
+    psf_pols1 = np.linspace(-0.1,-1*psf_pol_limit,100)
     psf_pols = np.concatenate((psf_pols, psf_pols1))
     final = []
     count = 0
@@ -84,8 +84,10 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, psf
             pool.starmap(tab_realisation, final)
     return None
 
-
 # path = config.workpath('Test')
+# training_set_tab(5, 5, 4, 5, 64, 64, 350, 380, path)
+
+
 # training_set_tab(2, 1, 1, 3, 64, 64,350, 350,  path)
 # table = Table.read(path + '/Input_data_0.fits')
 # pn = table['pixel_noise']

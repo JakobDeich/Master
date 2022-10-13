@@ -59,7 +59,7 @@ def generate_realisations(path_table, path, case):
     n_rot = table.meta['N_ROT']
     n_rea = table.meta['N_REA']
     # print(table['bound_y_bottom'])
-    pixel_scale = 0.1 #arcsec/pixel
+    pixel_scale = 0.1 #arcsec/pixel 
     pixel_scale_small = 0.02
     mag_sky = 22.35
     Sky_flux = sky_flux(mag_sky)
