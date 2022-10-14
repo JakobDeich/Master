@@ -14,9 +14,11 @@ start = time.time()
 
 def generate_psf():
     psf = galsim.OpticalPSF(lam = 600, diam = 1.2, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
-    for lam in [700,800,900]:
+    lams = [700,800,900]
+    for lam in lams:
         optical_psf = galsim.OpticalPSF(lam = lam, diam = 1.2, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
         psf = galsim.Add([psf, optical_psf])
+    psf = psf/(len(lams) + 1)
     return psf
 
 def gal_flux(mag): 
