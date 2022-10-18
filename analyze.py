@@ -74,7 +74,7 @@ def gal_mag(flux):
 def determine_boost(path, case):
     print('determining boost factor for case ' + str(case))
     mydir = config.workpath(path)
-    table = Table.read(mydir + '/Measured_ksb_' + str(case) + '.fits')
+    table = Table.read(mydir + '/Measured_ksb_new' + str(case) + '.fits')
     # for Galaxy in table:
     #     print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'], gal_mag(Galaxy['aperture_sum']))
     #     break
@@ -123,36 +123,34 @@ def determine_boost(path, case):
         table.add_columns([Col_A])
     except:
         table.replace_column(name = 'b_sm', col = Col_A)
-    table.write( mydir + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
+    table.write( mydir + '/Measured_ksb_new' + str(case) + '.fits' , overwrite=True) 
     return None
 
     
 # determine_boost('Test2',2)
+mydir = config.workpath('Test')
+table = Table.read(mydir + '/Measured_ksb.fits')
+# bsm = []
+# for i in range(200):
+#     bsm.append(table['b_sm'][i*10000])
+# print(bsm)
+# print(table['mag'][6*500])
 # mydir = config.workpath('Test2')
 # table = Table.read(mydir + '/Measured_ksb.fits')
-# # print(table)
-# # b = table['b_sm']
-# # e1 = table['e1']
-# # e2 = table['e2']
-# # n = table['n']
-# bsm = []
-# # ms = []
-# # rs = []
-# # ns = []
-# # psfs = []
-# # es = []
-# for i in range(100):
-#     bsm.append(table['b_sm'][i*500])
-# #     ms.append(table['mag'][i*10000])
-# #     rs.append(table['r_half'][i*10000])
-# #     ns.append(table['n'][i*10000])
-# #     psfs.append(abs(table['psf_pol'][i*10000]))
-# #     es.append((table['e1'][i*10000]**2 + table['e2'][i*10000]**2)**(1/2))
-# # plt.scatter(psfs,es, c = bsm , marker = 'o')
-# # plt.colorbar()
-# # plt.xlabel('psf polarisation')
-# # plt.ylabel('galaxy polarisation')
-# plt.hist(bsm, bins = 50, range= (-1,8))
+bsm = []
+psfs = []
+mags = []
+rs = []
+for i in range(200):
+    bsm.append(table['b_sm'][i*10000])
+    mags.append(table['psf_pol'][i*10000])
+    rs.append(table['r_half'][i*10000])
+# print(mags, rs)
+plt.scatter(mags,rs, c = bsm , marker = 'o', cmap = 'bwr')
+plt.colorbar()
+plt.xlabel('psf polarisation')
+plt.ylabel('half light radius')
+# plt.hist(bsm, bins = 50, range= (-40,40))
 # plt.xlabel('boost factor $b_{sm}$')
 # plt.ylabel('counts')
 # plt.savefig('Plots2/Histo_boost_big_new.pdf')

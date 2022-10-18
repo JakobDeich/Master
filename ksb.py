@@ -250,7 +250,7 @@ def calculate_ksb_training(path, case):
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     table = Table.read(path + '/Input_data_' + str(case) + '.fits')
     logging.info('Read in table from %s /table.fits' %path)
-    image_file = path + '/Grid_case' + str(case) + '.fits'
+    image_file = path + '/Grid_case_new' + str(case) + '.fits'
     gal_image = galsim.fits.read(image_file)
     stamp_x_size = table.meta['STAMP_X']
     stamp_y_size = table.meta['STAMP_Y']
@@ -262,14 +262,16 @@ def calculate_ksb_training(path, case):
     tab6 = []
     tab7 = []
     tab8 = []
-    PSF = galsim.fits.read(path + '/PSF_' + str(case) + '.fits')
+    tab9 = []
+    PSF = galsim.fits.read(path + '/PSF_new_' + str(case) + '.fits')
+    my_moments_psf = galsim.hsm.FindAdaptiveMom(PSF, guess_sig = 10, strict = (False))
     meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
     logging.info('start ksb algorithm')
     count = 0
     positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
     aperture = CircularAperture(positions, r=sigw_sub)
     for Galaxy in table:        
-        if count%2000==0:
+        if count%200==0:
             logging.warning('Galaxy number %i' %count)
             print(str(count) + ' Galaxies examined in case ' + str(case))
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
@@ -298,7 +300,9 @@ def calculate_ksb_training(path, case):
         else:
             tab6.append(1)
         tab7.append(my_moments.moments_sigma)
+        tab.append(my_moments_psf.moments_sigma)
         tab8.append(my_moments.moments_rho4)
+        tab9.append(meas_on_psf['e1'])
         count = count + 1 
     Col_A = Column(name = 'Pg_11', data = tab2)
     Col_B = Column(name = 'anisotropy_corr', data = tab3)
@@ -308,8 +312,10 @@ def calculate_ksb_training(path, case):
     Col_F = Column(name = 'Flag', data = tab6)
     Col_G = Column(name = 'sigma_mom', data = tab7)
     Col_H = Column(name = 'rho4_mom', data = tab8)
+    Col_I = Column(name = 'sigma_mom_psf', data = tab)
+    Col_J = Column(name = 'e1_cal_psf', data = tab9)
     try:
-        table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H])
+        table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H, Col_I, Col_J])
         logging.info('Add columns to table')
     except:
         table.replace_column(name = 'Pg_11', col = Col_A)
@@ -320,8 +326,10 @@ def calculate_ksb_training(path, case):
         table.replace_column(name = 'Flag', col = Col_F)
         table.replace_column(name = 'sigma_mom', col = Col_G)
         table.replace_column(name = 'rho4_mom', col = Col_H)
+        table.replace_column(name = 'sigma_mom_psf', col = Col_I)
+        table.replace_column(name = 'e1_cal_psf', col = Col_J)
         logging.info('replaced columns in table')
-    table.write( path + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
+    table.write( path + '/Measured_ksb_new_' + str(case) + '.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
