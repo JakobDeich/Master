@@ -250,28 +250,34 @@ def calculate_ksb_training(path, case):
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     table = Table.read(path + '/Input_data_' + str(case) + '.fits')
     logging.info('Read in table from %s /table.fits' %path)
-    image_file = path + '/Grid_case_new' + str(case) + '.fits'
+    image_file = path + '/Grid_case' + str(case) + '.fits'
     gal_image = galsim.fits.read(image_file)
     stamp_x_size = table.meta['STAMP_X']
     stamp_y_size = table.meta['STAMP_Y']
-    tab = []
-    tab2 = []
-    tab3 = []
-    tab4 = []
-    tab5 = []
-    tab6 = []
-    tab7 = []
-    tab8 = []
-    tab9 = []
-    PSF = galsim.fits.read(path + '/PSF_new_' + str(case) + '.fits')
-    my_moments_psf = galsim.hsm.FindAdaptiveMom(PSF, guess_sig = 10, strict = (False))
-    meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
+    tab1  = []
+    tab2  = []
+    tab3  = []
+    tab4  = []
+    tab5  = []
+    tab6  = []
+    tab7  = []
+    tab8  = []
+    tab9  = []
+    tab10 = []
+    PSF = galsim.fits.read(path + '/PSF_' + str(case) + '.fits')
+    PSF = galsim.InterpolatedImage(PSF, scale = 0.02)
+    Pixel = galsim.Pixel(scale = 0.1)
+    PSF = galsim.Convolve([Pixel, PSF])
+    psf_image = galsim.ImageF(table.meta['PSF_X'], table.meta['PSF_Y'], scale = 0.02)
+    PSF.drawImage(psf_image,method='no_pixel')
+    my_moments_psf = galsim.hsm.FindAdaptiveMom(psf_image, guess_sig = 10, strict = (False))
+    meas_on_psf = ksb_moments(psf_image.array, sigw = sigw_sub)
     logging.info('start ksb algorithm')
     count = 0
     positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
     aperture = CircularAperture(positions, r=sigw_sub)
     for Galaxy in table:        
-        if count%200==0:
+        if count%2000==0:
             logging.warning('Galaxy number %i' %count)
             print(str(count) + ' Galaxies examined in case ' + str(case))
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
@@ -290,7 +296,7 @@ def calculate_ksb_training(path, case):
         b = tbl['semiminor_sigma'] 
         my_moments = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 10, strict = (False))
         Radius = np.sqrt( a * b )
-        tab.append(Radius)
+        tab1.append(Radius)
         tab2.append(P_g11)
         tab3.append(e1_anisotropy_correction)
         tab4.append(meas_on_galaxy['e1'])
@@ -300,7 +306,7 @@ def calculate_ksb_training(path, case):
         else:
             tab6.append(1)
         tab7.append(my_moments.moments_sigma)
-        tab.append(my_moments_psf.moments_sigma)
+        tab10.append(my_moments_psf.moments_sigma)
         tab8.append(my_moments.moments_rho4)
         tab9.append(meas_on_psf['e1'])
         count = count + 1 
@@ -308,11 +314,11 @@ def calculate_ksb_training(path, case):
     Col_B = Column(name = 'anisotropy_corr', data = tab3)
     Col_C = Column(name = 'e1_cal', data = tab4)
     Col_D = Column(name = 'aperture_sum', data = tab5)
-    Col_E = Column(name = 'radius_est', data = tab)
+    Col_E = Column(name = 'radius_est', data = tab1)
     Col_F = Column(name = 'Flag', data = tab6)
     Col_G = Column(name = 'sigma_mom', data = tab7)
     Col_H = Column(name = 'rho4_mom', data = tab8)
-    Col_I = Column(name = 'sigma_mom_psf', data = tab)
+    Col_I = Column(name = 'sigma_mom_psf', data = tab10)
     Col_J = Column(name = 'e1_cal_psf', data = tab9)
     try:
         table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H, Col_I, Col_J])
@@ -329,10 +335,15 @@ def calculate_ksb_training(path, case):
         table.replace_column(name = 'sigma_mom_psf', col = Col_I)
         table.replace_column(name = 'e1_cal_psf', col = Col_J)
         logging.info('replaced columns in table')
-    table.write( path + '/Measured_ksb_new_' + str(case) + '.fits' , overwrite=True) 
+    table.write( path + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
+# path = config.workpath('Test2')
+# calculate_ksb_training(path, 0)
+# calculate_ksb_training(path, 1)
+# calculate_ksb_training(path, 2)
+# calculate_ksb_training(path, 3)
 
 def calculate_ksb_galsim(path):
     PSF = galsim.fits.read(path + '/PSF_5.fits')

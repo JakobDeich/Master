@@ -74,83 +74,72 @@ def gal_mag(flux):
 def determine_boost(path, case):
     print('determining boost factor for case ' + str(case))
     mydir = config.workpath(path)
-    table = Table.read(mydir + '/Measured_ksb_new' + str(case) + '.fits')
+    table = Table.read(mydir + '/Measured_ksb_' + str(case) + '.fits')
     # for Galaxy in table:
     #     print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'], gal_mag(Galaxy['aperture_sum']))
     #     break
     shears = table.meta['N_SHEAR']
     n_rea = table.meta['N_REA']
     n_canc = table.meta['N_CANC']
-    shear = np.linspace(-0.06, 0.06, shears)
-    bs_real = []
     bsm = np.linspace(1.,1.4,3)
-    gamma_real = np.linspace(-0.06, 0.06, shears)
-    gamma_real2 = np.linspace(-0.06, 0.06, 100)
     cs = []
     for b in bsm:
-        gamma_cal = []
-        for j in shear:
-            e_corr = []
-            P_g11 = []
-            e1 = []
-            for Galaxy in table:
-                if (Galaxy['gamma1']-10**(-4)) <= j and (Galaxy['gamma1']+10**(-4)) >= j:
-                    param = Galaxy['e1_cal']
-                    e1.append(param)
-                    param = Galaxy['anisotropy_corr']
-                    e_corr.append(param)
-                    param = Galaxy['Pg_11']
-                    P_g11.append(param)
-            e1 = np.asarray(e1)
-            e_corr = np.asarray(e_corr)
-            P_g11 = np.asarray(P_g11)
-            mean1 = np.mean(e1- b * e_corr)
-            mean2 = np.mean(P_g11)
-            gamma_cal.append(mean1/mean2)
-        popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
-        # plt.scatter(gamma_real, gamma_cal)
-        bias = popt[1]
-        # plt.scatter(gamma_real, gamma_cal)
-        # plt.plot(gamma_real2, linear(gamma_real2, popt[0], bias))
-        cs.append(bias) 
+        e_corr = []
+        P_g11 = []
+        e1 = []
+        for Galaxy in table:
+            param = Galaxy['e1_cal']
+            e1.append(param)
+            param = Galaxy['anisotropy_corr']
+            e_corr.append(param)
+            param = Galaxy['Pg_11']
+            P_g11.append(param)
+        e1 = np.asarray(e1)
+        e_corr = np.asarray(e_corr)
+        P_g11 = np.asarray(P_g11)
+        mean1 = np.mean(e1- b * e_corr)
+        mean2 = np.mean(P_g11)
+        cs.append(mean1/mean2)
+        # popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
+        # bias = popt[1]
+        # cs.append(np.mean(gamma_cal)) 
     popt, pcov = curve_fit(linear, bsm, cs)
     m2 = popt[0]
     b2 = popt[1]
-    bs_real.append(-1*b2/m2)
-    tab = np.ones(n_rea*n_canc)*(-1*b2/m2)
-    Col_A = Column(name = 'b_sm', data = tab)
-    try:
-        table.add_columns([Col_A])
-    except:
-        table.replace_column(name = 'b_sm', col = Col_A)
-    table.write( mydir + '/Measured_ksb_new' + str(case) + '.fits' , overwrite=True) 
+    print(-1*b2/m2)
+    # Col_A = Column(name = 'b_sm', data = tab)
+    # try:
+    #     table.add_columns([Col_A])
+    # except:
+    #     table.replace_column(name = 'b_sm', col = Col_A)
+    # table.write( mydir + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
     return None
 
     
-# determine_boost('Test2',2)
-mydir = config.workpath('Test')
-table = Table.read(mydir + '/Measured_ksb.fits')
+# determine_boost('Test2',3)
+# mydir = config.workpath('Test')
+# # table = Table.read(mydir + '/Measured_ksb.fits')
+# table = Table.read(mydir + '/Input_data_17.fits')
+# print(table)
+# # bsm = []
+# # for i in range(200):
+# #     bsm.append(table['b_sm'][i*10000])
+# # print(bsm)
+# # print(table['mag'][6*500])
 # bsm = []
-# for i in range(200):
+# psfs = []
+# mags = []
+# rs = []
+# for i in range(197):
 #     bsm.append(table['b_sm'][i*10000])
-# print(bsm)
-# print(table['mag'][6*500])
-# mydir = config.workpath('Test2')
-# table = Table.read(mydir + '/Measured_ksb.fits')
-bsm = []
-psfs = []
-mags = []
-rs = []
-for i in range(200):
-    bsm.append(table['b_sm'][i*10000])
-    mags.append(table['psf_pol'][i*10000])
-    rs.append(table['r_half'][i*10000])
-# print(mags, rs)
-plt.scatter(mags,rs, c = bsm , marker = 'o', cmap = 'bwr')
-plt.colorbar()
-plt.xlabel('psf polarisation')
-plt.ylabel('half light radius')
-# plt.hist(bsm, bins = 50, range= (-40,40))
+#     mags.append(table['psf_pol'][i*10000])
+#     rs.append(table['r_half'][i*10000])
+# # # print(mags, rs)
+# # plt.scatter(mags,rs, c = bsm , marker = 'o', cmap = 'bwr')
+# # plt.colorbar()
+# # plt.xlabel('psf polarisation')
+# # plt.ylabel('half light radius')
+# plt.hist(bsm, bins = 50, range= (0,4))
 # plt.xlabel('boost factor $b_{sm}$')
 # plt.ylabel('counts')
 # plt.savefig('Plots2/Histo_boost_big_new.pdf')

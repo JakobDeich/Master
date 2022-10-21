@@ -12,11 +12,11 @@ import config
 import analyze
 from astropy.table import Table, vstack
 
-start = time.time()
+# start = time.time()
 
 def generate_sim_trainingSet(path, case):
     mydir =config.workpath(path)
-    # tab.training_set_tab(5, 10, case, 5, 64, 64, 350, 350, mydir)
+    tab.training_set_tab(5, 20, case, 50, 64, 64, 350, 350, mydir)
     cases = np.arange(case)
     #gal_image = []
     final = []
@@ -36,24 +36,24 @@ def generate_sim_trainingSet(path, case):
     return None
 # generate_sim_trainingSet('Test2', 1)
 
-def ksb_and_boost(path, case):
+def ksb_training(path, case):
     mydir = config.workpath(path)
     cases = np.arange(case)
     final = []
     for i in range(case):
         params = [mydir, cases[i]]
         final.append(params)
-    # with Pool() as pool:
-    #     pool.starmap(ksb.calculate_ksb_training, final)
     with Pool() as pool:
-        pool.starmap(analyze.determine_boost, final)
+        pool.starmap(ksb.calculate_ksb_training, final)
+    # with Pool() as pool:
+    #     pool.starmap(analyze.determine_boost, final)
     table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
     for i in range(case):
-        table1 = Table.read(mydir + '/Measured_ksb_new_'+ str(i) + '.fits')
+        table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')
         table = vstack([table,table1]) 
     if not os.path.isdir(mydir):
         os.mkdir(mydir)
-    file_name = os.path.join(mydir, 'Measured_ksb_new.fits')
+    file_name = os.path.join(mydir, 'Measured_ksb.fits')
     table.write( file_name , overwrite=True)     
     return None
 #generate_sim_trainingSet('Test', 4)    
@@ -145,6 +145,6 @@ def calculate_shear(N, runname):
 # simulate_Grids(20, 'Run6/PSF_es', 0.1)
 # calculate_shear(20, 'Run6/PSF_es')  
 
-end = time.time()
-total_time = (end - start)/(60*60)  #run time in hours
+# end = time.time()
+# total_time = (end - start)/(60*60)  #run time in hours
 #print('The system took ', total_time ,' hours to execute the function')

@@ -2,13 +2,15 @@ import galsim
 from astropy.table import Table, Column
 import numpy as np
 import os
+import random
 import tab
 import time
 import logging
 import astropy.units
 import coord
 import config
-start = time.time()
+import glob
+# start = time.time()
 
 # table = tab.generate_table(5,5,40,40)
 
@@ -67,17 +69,21 @@ def generate_realisations(path_table, path, case):
     Sky_flux = sky_flux(mag_sky)
     gain = 3.1 #e/ADU
     gal_image = galsim.ImageF((stamp_xsize *n_rot *2), stamp_ysize *n_shear *n_rea, scale = pixel_scale)
-    #define optical psf with Euclid condition and anisotropy
-    psf = generate_psf()
-    psf = psf.shear(e1 = table['psf_pol'][0])
     #creating the grid and placing galaxies on it
     count = 0
-    for Galaxy in table:
-        psf_image = galsim.ImageF(psf_stamp_x, psf_stamp_y, scale = pixel_scale_small)
-        psf.drawImage(psf_image)
-        file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
-        psf_image.write(file_name)
-        break
+    #draw random Euclid PSF and anisotropy
+    PSFs_link = sorted(glob.glob('/vol/euclid5/euclid5_raid3/mtewes/Euclid_PSFs_Lance_Jan_2020/f*/sed_true*.fits'))
+    PSF_indices = np.arange(len(PSFs_link), dtype=int)
+    rng = np.random.default_rng()
+    PSF_index = rng.choice(PSF_indices, size = 1)
+    # print(PSFs_link, PSF_indices, PSF_index[0])
+    PSF = galsim.fits.read(PSFs_link[PSF_index[0]], hdu = 1)
+    psf = galsim.InterpolatedImage(PSF, scale = pixel_scale_small)
+    psf = psf.shear(e1 = table['psf_pol'][0])
+    psf_image = galsim.ImageF(psf_stamp_x, psf_stamp_y, scale = pixel_scale_small)
+    psf.drawImage(psf_image)
+    file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
+    psf_image.write(file_name)
     for Galaxy in table:
         gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
         if count%2000==0:
@@ -116,7 +122,6 @@ def generate_realisations(path_table, path, case):
     gal_image.write(file_name)
     return None
     
-
     
 # path = config.workpath('Test/')
 # # tab.training_set_tab(5, 10, 1, 2, 64, 64,350, 350, path)
@@ -201,7 +206,7 @@ def generate_image(path_table, path):
 # table2 = Table.read('Test/Gamma.fits')
 # print(table2)
 
-end = time.time()
+# end = time.time()
 
-total_time = (end - start)/(60*60)  #run time in hours
+# total_time = (end - start)/(60*60)  #run time in hours
 # print('The system took ', total_time ,' hours to execute the function')
