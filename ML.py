@@ -55,18 +55,25 @@ def threeD_to_oneD(array, ncas, nrea):
             tab[case * nrea + rea] = array[case][rea][0]       
     return tab
 
-def oneD_to_threeD(path, parameter, ncas, nreas):
-    array = np.zeros((ncas , nreas,1))
-    for i in range(ncas):
+def oneD_to_threeD(path, parameter, ncas, nreas, case_percentage):
+    array = np.zeros((round(ncas*case_percentage) , nreas,1))
+    array2 = np.zeros((round(ncas - ncas*case_percentage) , nreas,1))
+    for i in range(round(ncas*case_percentage)):
         path2 = config.workpath(path + '/Measured_ksb_' + str(i) +'.fits')
         table =Table.read(path2)
         for j in range(nreas):
             array[i][j][0] = table[j][parameter]
-    return array
+    for i,k in enumerate(np.arange(round(ncas*case_percentage), ncas)):
+        path2 = config.workpath(path + '/Measured_ksb_' + str(k) +'.fits')
+        table =Table.read(path2)
+        for j in range(nreas):
+            array2[i][j][0] = table[j][parameter]    
+    return array, array2
 
 
 
 def Data_processing(path, case_percentage = 1):
+    dic = {}
     mydir = config.workpath(path)
     table = Table.read(mydir + '/Measured_ksb.fits')
     ncas = table.meta['N_CAS']
@@ -122,7 +129,17 @@ def Data_processing(path, case_percentage = 1):
     features_test = np.delete(features_test, flags, 0)
     ac_test = np.delete(ac_test, flags, 0)
     e1_test = np.delete(e1_test, flags, 0)
-    return features, ac, e1, Pg, nreas, len(feas), features_test, ac_test, e1_test, Pg_test
+    dic['features'] = features
+    dic['anisotropy_corr'] = ac
+    dic['e1_cal'] = e1
+    dic['Pg_11'] = Pg
+    dic['features_test'] = features_test
+    dic['anisotropy_corr_test'] = ac_test
+    dic['e1_cal_test'] = e1_test
+    dic['Pg_11_test'] = Pg_test
+    dic['n_rea'] = nreas
+    dic['n_fea'] = len(feas)
+    return dic
 
 
 def cost_func(preds, polarisation, anisotropy_corr):
@@ -156,7 +173,7 @@ def create_model(nreas, nfea, hidden_layers = (3,3)):
     model.add_loss(cost_func(x, auxilary_fea1, auxilary_fea2))
     return model
 
-def boostFDep(Parameter, bsm, Plot_Name):
+def boostFDep(Parameter, bsm, nreas, Plot_Name):
     aper_sum = oneD_to_threeD('Test2', Parameter, 75, nreas)
     bsm_mean = np.zeros((75))
     aper_mean = np.zeros((75))    
@@ -181,13 +198,13 @@ def boostFDep(Parameter, bsm, Plot_Name):
     plt.ylabel('boost factor')
     plt.show()
 
-features, ac, e1,Pg, nreas, nfea, features_test, ac_test, e1_test, Pg_test = Data_processing('Test3', 1)
+dic = Data_processing('Test3', 0.5)
 # print(cost_func(tf.ones((3,10,1)), e1, ac))
 # print(features)
 checkpoint_path = config.workpath("training_1/cp.ckpt")
 checkpoint_dir = os.path.dirname(checkpoint_path)
-def train(features, polarisation, anisotropy_corr, nreas, nfea, checkpoint_path):
-    model = create_model(nreas, nfea)
+def train(dic, checkpoint_path):
+    model = create_model(dic['n_rea'], dic['n_fea'])
     model.compile(
             loss = None,
             optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
@@ -197,7 +214,7 @@ def train(features, polarisation, anisotropy_corr, nreas, nfea, checkpoint_path)
             save_weights_only=True,
             verbose=1)
     history = model.fit(
-            [features, polarisation, anisotropy_corr], 
+            [dic['features'], dic['e1_cal'], dic['anisotropy_corr']], 
             None, 
             epochs = 100,
             verbose = 2, 
@@ -205,12 +222,18 @@ def train(features, polarisation, anisotropy_corr, nreas, nfea, checkpoint_path)
             callbacks=[cp_callback]) 
     return model, history
 
-def validate(features_val, polarisation_val, anisotropy_corr_val, nreas, nfea, checkpoint_path):
+def validate(dic, checkpoint_path):
     checkpoint_path = config.workpath("training_1/cp.ckpt")
-    model = create_model(nreas, nfea)
+    model = create_model(dic['n_rea'], dic['n_fea'])
+    model.compile(
+            loss = None,
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+            metrics = [])
     model.load_weights(checkpoint_path)
-    loss = model.evaluate([features_val, polarisation_val, anisotropy_corr_val])
-    return loss
+    loss = model.evaluate([dic['features_test'], dic['e1_cal_test'], dic['anisotropy_corr_test']])
+    print(loss)
+    val_preds = model.predict(x = [dic['features_test'], dic['e1_cal_test'], dic['anisotropy_corr_test']])
+    return val_preds
 
 def test(features_test, polarisation_test, anisotropy_corr_test, nreas, nfea, checkpoint_path):
     checkpoint_path = config.workpath("training_1/cp.ckpt")
@@ -218,27 +241,78 @@ def test(features_test, polarisation_test, anisotropy_corr_test, nreas, nfea, ch
     model.load_weights(checkpoint_path)
     test_preds = model.predict(x = [features_test, polarisation_test, anisotropy_corr_test])
     return test_preds
-model, history = train(features, e1, ac, nreas, nfea, checkpoint_path)
-# bsm = model.predict(x = [features, e1, ac])
+model, history = train(dic, checkpoint_path)
+val_preds = validate(dic, checkpoint_path)
+bsm = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
 # print(bsm)
-# e = (e1 -  bsm * ac)
-# e2 = (e1 -  ac)
-# P_g = np.mean(Pg)
-# aper_sum = oneD_to_threeD('Test3', 'sigma_mom', 75, nreas)
-# e_mean = np.zeros((75))
-# param_mean = np.zeros((75)) 
-# e2_mean = np.zeros((75))   
-# for i in range(75):
-#     e_mean[i] = np.mean(e[i,:])
-#     e2_mean[i] = np.mean(e2[i,:])
-#     param_mean[i] = np.mean(aper_sum[i,:])
-# plt.scatter(param_mean, e_mean, marker = '.', label = 'Boost factor applied')
-# plt.scatter(param_mean, e2_mean, marker = '.', label = 'Boost factor not applied')
-# plt.xlabel('sigma moments')
-# plt.ylabel('mean polarisation of case')
-# plt.legend()
-# plt.show()
 
+def mean_of(ncas, e1, e1_no_boost, param):
+    dic = {}
+    e_mean = np.zeros(ncas)
+    param_mean = np.zeros(ncas) 
+    e2_mean = np.zeros(ncas)  
+    for i in range(ncas):
+        e_mean[i] = np.mean(e1[i,:])
+        e2_mean[i] = np.mean(e1_no_boost[i,:])
+        param_mean[i] = np.mean(param[i,:])
+    dic['e_mean'] = e_mean
+    dic['e2_mean'] = e2_mean
+    dic['param_mean'] = param_mean
+    return dic
+
+def cases(dic, path, bsm, val_preds, case_percentage, param, param_name, training_option = True):
+    e = (dic['e1_cal'] -  bsm * dic['anisotropy_corr'])
+    e3 = (dic['e1_cal_test'] -  val_preds * dic['anisotropy_corr_test'])
+    e2 = (dic['e1_cal'] -  dic['anisotropy_corr'])
+    e4 = (dic['e1_cal_test'] -  dic['anisotropy_corr_test'])
+    aper_sum, aper_sum2 = oneD_to_threeD(path, param, 75, dic['n_rea'], 0.5)
+    dic1 = mean_of(round(75*case_percentage), e, e2, aper_sum)
+    dic2 = mean_of(75 - round(75*case_percentage), e3, e4, aper_sum2)
+    improvement = np.absolute(dic1['e_mean']/dic1['e2_mean'])
+    improvement2 = np.absolute(dic2['e_mean']/dic2['e2_mean'])
+    improvement_color = []
+    if training_option:
+        for i in improvement:
+            if i > 1:
+                improvement_color.append('red')
+            else:
+                improvement_color.append('blue')     
+        plt.bar(dic1['param_mean'], improvement, width = max(dic1['param_mean'])/(round(75*case_percentage)*3), align='center', color = improvement_color)
+        plt.ylabel('fraction of non boosted PSF-anisotropy-corrected polarisations')
+        plt.xlabel(param_name)
+        plt.show()
+    else:
+        for i in improvement2:
+            if i > 1:
+                improvement_color.append('red')
+            else:
+                improvement_color.append('blue')
+        plt.bar(dic2['param_mean'], improvement2, width = max(dic2['param_mean'])/(round(75*case_percentage)*3),align='center', color = improvement_color)
+        plt.ylabel('fraction of non boosted PSF-anisotropy-corrected polarisations')
+        plt.xlabel(param_name)
+        plt.show()
+    
+    # dic1 = mean_of(round(75*case_percentage), e, e2, aper_sum)
+    # print(np.mean(abs(dic1['e_mean'])), np.mean(abs(dic1['e2_mean'])))
+    # dic2 = mean_of(75 - r'aperture sumound(75*case_percentage), e3, e4, aper_sum2)
+    # print(np.mean(abs(dic2['e_mean'])), np.mean(abs(dic2['e2_mean'])))
+    # bar = [np.mean(abs(dic1['e_mean'])), np.mean(abs(dic1['e2_mean'])), np.mean(abs(dic2['e_mean'])), np.mean(abs(dic2['e2_mean']))]
+    # y_pos = np.arange(len(bar))
+    # plt.bar(y_pos, bar, align='center', color = ['b', 'b', 'r', 'r'])
+    # bar_name = ['trained $b_{sm}$', '$b_{sm} = 1$ with training data', 'validated $b_{sm}$', '$b_{sm} = 1$ with validation data']
+    # plt.xticks(y_pos, bar_name)
+    # plt.ylabel('Mean of the absolute value of the PSF-anisotropy-corrected polarisations of each case')
+    # plt.scatter(dic1['param_mean'], dic1['e_mean'], marker = '.', label = '$b_{sm}$ training')
+    # plt.scatter(dic1['param_mean'], dic1['e2_mean'], marker = '.', label = '$b_{sm} = 1$')
+    # plt.scatter(dic2['param_mean'], dic2['e_mean'], marker = '.', label = '$b_{sm}$ validation')
+    # plt.scatter(dic2['param_mean'], dic2['e2_mean'], marker = '.', label = '$b_{sm} = 1$ validation')
+    # plt.xlabel(param_name)
+    # plt.ylabel('Mean PSF-anisotropy-corrected polarisation')
+    # plt.legend()
+    # plt.show()
+    
+    
+cases(dic, 'Test3', bsm, val_preds, 0.5, 'aperture_sum', 'aperture sum', False)
 #boostFDep('sigma_mom', 'sigma moments')
 #boostFDep('rho4_mom', 'rho4 moments')
 # boostFDep('aperture_sum', 'aperture sum')
