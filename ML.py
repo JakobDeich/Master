@@ -198,7 +198,7 @@ def boostFDep(Parameter, bsm, nreas, Plot_Name):
     plt.ylabel('boost factor')
     plt.show()
 
-dic = Data_processing('Test3', 0.5)
+dic = Data_processing('Test3', 1)
 # print(cost_func(tf.ones((3,10,1)), e1, ac))
 # print(features)
 checkpoint_path = config.workpath("training_1/cp.ckpt")
@@ -242,7 +242,7 @@ def test(features_test, polarisation_test, anisotropy_corr_test, nreas, nfea, ch
     test_preds = model.predict(x = [features_test, polarisation_test, anisotropy_corr_test])
     return test_preds
 model, history = train(dic, checkpoint_path)
-val_preds = validate(dic, checkpoint_path)
+# val_preds = validate(dic, checkpoint_path)
 bsm = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
 # print(bsm)
 
@@ -291,13 +291,37 @@ def cases(dic, path, bsm, val_preds, case_percentage, param, param_name, trainin
         plt.ylabel('fraction of non boosted PSF-anisotropy-corrected polarisations')
         plt.xlabel(param_name)
         plt.show()
-    
+        
+
+def cases_scatter_plot(dic,bsm, path, param):
+    e = (dic['e1_cal'] -  bsm * dic['anisotropy_corr'])
+    e2 = (dic['e1_cal'] -  dic['anisotropy_corr'])
+    aper_sum, aper_sum2 = oneD_to_threeD(path, param, 75, dic['n_rea'], 1)
+    dic1 = mean_of(75, e, e2, aper_sum)
+    plt.scatter(dic1['param_mean'], dic1['e2_mean'], marker = '.', label = '$b^{sm} = 1$')
+    plt.xlabel('psf polarisation')
+    plt.ylabel('psf anisotropy corrected polarisation per case')
+    plt.legend(loc = 'upper center')
+    plt.ylim([-0.0025, 0.0025])
+    plt.tight_layout()
+    plt.savefig('Plots2/C-bias/Conf_noBSM.png')
+    plt.show()
+    # plt.scatter(dic1['param_mean'], dic1['e2_mean'], label = '$b^{sm} = 1$')
+    plt.scatter(dic1['param_mean'], dic1['e_mean'], marker = '.', label = 'neural network estimate for $b^{sm}$')
+    plt.xlabel('psf polarisation')
+    plt.ylabel('psf anisotropy corrected polarisation per case')
+    plt.legend(loc = 'upper center')
+    plt.savefig('Plots2/C-bias/Conf_BSM.png')
+    return None
+
+
+
     # dic1 = mean_of(round(75*case_percentage), e, e2, aper_sum)
     # print(np.mean(abs(dic1['e_mean'])), np.mean(abs(dic1['e2_mean'])))
     # dic2 = mean_of(75 - r'aperture sumound(75*case_percentage), e3, e4, aper_sum2)
     # print(np.mean(abs(dic2['e_mean'])), np.mean(abs(dic2['e2_mean'])))
     # bar = [np.mean(abs(dic1['e_mean'])), np.mean(abs(dic1['e2_mean'])), np.mean(abs(dic2['e_mean'])), np.mean(abs(dic2['e2_mean']))]
-    # y_pos = np.arange(len(bar))
+    # y_pos = np.arange(len(bar))'psf anisotropy corrected polarisation per case'
     # plt.bar(y_pos, bar, align='center', color = ['b', 'b', 'r', 'r'])
     # bar_name = ['trained $b_{sm}$', '$b_{sm} = 1$ with training data', 'validated $b_{sm}$', '$b_{sm} = 1$ with validation data']
     # plt.xticks(y_pos, bar_name)
@@ -312,7 +336,8 @@ def cases(dic, path, bsm, val_preds, case_percentage, param, param_name, trainin
     # plt.show()
     
     
-cases(dic, 'Test3', bsm, val_preds, 0.5, 'aperture_sum', 'aperture sum', False)
+# cases(dic, 'Test3', bsm, val_preds, 0.5, 'aperture_sum', 'aperture sum', False)
+cases_scatter_plot(dic, bsm, 'Test3', 'e1_cal_psf')
 #boostFDep('sigma_mom', 'sigma moments')
 #boostFDep('rho4_mom', 'rho4 moments')
 # boostFDep('aperture_sum', 'aperture sum')
