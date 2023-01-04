@@ -16,14 +16,14 @@ from astropy.table import Table, vstack
 
 def generate_sim_trainingSet(path, case):
     mydir =config.workpath(path)
-    tab.training_set_tab(5, 20, case, 50, 64, 64, 350, 350, mydir)
+    tab.training_set_tab(3, 10, case, 400, 64, 64, 350, 350, mydir)
     cases = np.arange(case)
     #gal_image = []
     final = []
     for i in range(case):
         params = [mydir + '/Input_data_' + str(i) + '.fits', mydir, cases[i]]
         final.append(params)
-    with Pool() as pool:
+    with Pool(processes =100) as pool:
         pool.starmap(image.generate_realisations, final)
     table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
     for i in range(case):
@@ -43,10 +43,8 @@ def ksb_training(path, case):
     for i in range(case):
         params = [mydir, cases[i]]
         final.append(params)
-    with Pool() as pool:
+    with Pool(processes = 100) as pool:
         pool.starmap(ksb.calculate_ksb_training, final)
-    # with Pool() as pool:
-    #     pool.starmap(analyze.determine_boost, final)
     table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
     for i in range(case):
         table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')

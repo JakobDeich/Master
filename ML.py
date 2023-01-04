@@ -3,7 +3,7 @@ import numpy as np
 import random
 import astropy
 import matplotlib
-matplotlib.use('tkagg')
+# matplotlib.use('tkagg')
 import matplotlib.pyplot as plt
 from ML_Tensorflow.python.ML_Tensorflow import layer
 # from ML_Tensorflow.python.ML_Tensorflow import models
@@ -17,32 +17,32 @@ import tensorflow as tf
     
 import logging
 
-aper = np.ones(30)*400
-sigma_mom = np.ones(30)*10
-ac = np.ones(30)*0.01
-e1 = np.ones(30)*0.01
-Pg = np.ones(30)
-for i in range(30):
-    if i >= 20:
-        ac[i] = 0.01/1.2
-        sigma_mom[i] = 30
-    elif i >= 10:
-        ac[i] = 0.01/1.1
-        sigma_mom[i] = 20
-for i in range(30):
-    if i%2 == 0:
-        ac[i] = 1 * ac[i]
-        e1[i] = 1 * e1[i]
-table1 = Table([aper, sigma_mom, e1], names = ['aperture_sum', 'sigma_mom', 'e1_cal'], dtype = ['f4', 'f4', 'f4'], meta = {'n_cas':3, 'n_rea': 10, 'n_canc':1})
-if not os.path.isdir(config.workpath('Test4')):
-    os.mkdir(config.workpath('Test4'))
-table1.write( config.workpath('Test4/Measured_ksb.fits') , overwrite=True) 
-table2 = Table([aper[0:10], sigma_mom[0:10], e1[0:10], ac[0:10], Pg[0:10]], names = ['aperture_sum', 'sigma_mom', 'e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4'])
-table2.write( config.workpath('Test4/Measured_ksb_0.fits') , overwrite=True) 
-table2 = Table([aper[10:20], sigma_mom[10:20], e1[10:20], ac[10:20], Pg[10:20]], names = ['aperture_sum', 'sigma_mom', 'e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4'])
-table2.write( config.workpath('Test4/Measured_ksb_1.fits') , overwrite=True) 
-table2 = Table([aper[20:30], sigma_mom[20:30], e1[20:30], ac[20:30], Pg[20:30]], names = ['aperture_sum', 'sigma_mom', 'e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4'])
-table2.write( config.workpath('Test4/Measured_ksb_2.fits') , overwrite=True) 
+# aper = np.ones(30)*400
+# sigma_mom = np.ones(30)*10
+# ac = np.ones(30)*0.01
+# e1 = np.ones(30)*0.01
+# Pg = np.ones(30)
+# for i in range(30):
+#     if i >= 20:
+#         ac[i] = 0.01/1.2
+#         sigma_mom[i] = 30
+#     elif i >= 10:
+#         ac[i] = 0.01/1.1
+#         sigma_mom[i] = 20
+# for i in range(30):
+#     if i%2 == 0:
+#         ac[i] = 1 * ac[i]
+#         e1[i] = 1 * e1[i]
+# table1 = Table([aper, sigma_mom, e1], names = ['aperture_sum', 'sigma_mom', 'e1_cal'], dtype = ['f4', 'f4', 'f4'], meta = {'n_cas':3, 'n_rea': 10, 'n_canc':1})
+# if not os.path.isdir(config.workpath('Test4')):
+#     os.mkdir(config.workpath('Test4'))
+# table1.write( config.workpath('Test4/Measured_ksb.fits') , overwrite=True) 
+# table2 = Table([aper[0:10], sigma_mom[0:10], e1[0:10], ac[0:10], Pg[0:10]], names = ['aperture_sum', 'sigma_mom', 'e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4'])
+# table2.write( config.workpath('Test4/Measured_ksb_0.fits') , overwrite=True) 
+# table2 = Table([aper[10:20], sigma_mom[10:20], e1[10:20], ac[10:20], Pg[10:20]], names = ['aperture_sum', 'sigma_mom', 'e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4'])
+# table2.write( config.workpath('Test4/Measured_ksb_1.fits') , overwrite=True) 
+# table2 = Table([aper[20:30], sigma_mom[20:30], e1[20:30], ac[20:30], Pg[20:30]], names = ['aperture_sum', 'sigma_mom', 'e1_cal', 'anisotropy_corr', 'Pg_11'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4'])
+# table2.write( config.workpath('Test4/Measured_ksb_2.fits') , overwrite=True) 
 # mydir = config.workpath('Test4')
 # table = Table.read(mydir + '/Measured_ksb_2.fits')
 # print(table)
@@ -198,7 +198,7 @@ def boostFDep(Parameter, bsm, nreas, Plot_Name):
     plt.ylabel('boost factor')
     plt.show()
 
-dic = Data_processing('Test3', 1)
+
 # print(cost_func(tf.ones((3,10,1)), e1, ac))
 # print(features)
 checkpoint_path = config.workpath("training_1/cp.ckpt")
@@ -241,10 +241,8 @@ def test(features_test, polarisation_test, anisotropy_corr_test, nreas, nfea, ch
     model.load_weights(checkpoint_path)
     test_preds = model.predict(x = [features_test, polarisation_test, anisotropy_corr_test])
     return test_preds
-model, history = train(dic, checkpoint_path)
-# val_preds = validate(dic, checkpoint_path)
-bsm = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
-# print(bsm)
+
+
 
 def mean_of(ncas, e1, e1_no_boost, param):
     dic = {}
@@ -296,11 +294,11 @@ def cases(dic, path, bsm, val_preds, case_percentage, param, param_name, trainin
 def cases_scatter_plot(dic,bsm, path, param):
     e = (dic['e1_cal'] -  bsm * dic['anisotropy_corr'])
     e2 = (dic['e1_cal'] -  dic['anisotropy_corr'])
-    aper_sum, aper_sum2 = oneD_to_threeD(path, param, 75, dic['n_rea'], 1)
-    dic1 = mean_of(75, e, e2, aper_sum)
+    params, params2 = oneD_to_threeD(path, param, 75, dic['n_rea'], 1)
+    dic1 = mean_of(75, e, e2, params)
     plt.scatter(dic1['param_mean'], dic1['e2_mean'], marker = '.', label = '$b^{sm} = 1$')
-    plt.xlabel('psf polarisation')
-    plt.ylabel('psf anisotropy corrected polarisation per case')
+    plt.xlabel('$e_1^{PSF}$ psf polarisation')
+    plt.ylabel('$c_1$ additive bias')
     plt.legend(loc = 'upper center')
     plt.ylim([-0.0025, 0.0025])
     plt.tight_layout()
@@ -308,10 +306,10 @@ def cases_scatter_plot(dic,bsm, path, param):
     plt.show()
     # plt.scatter(dic1['param_mean'], dic1['e2_mean'], label = '$b^{sm} = 1$')
     plt.scatter(dic1['param_mean'], dic1['e_mean'], marker = '.', label = 'neural network estimate for $b^{sm}$')
-    plt.xlabel('psf polarisation')
-    plt.ylabel('psf anisotropy corrected polarisation per case')
+    plt.xlabel('$e_1^{PSF}$ psf polarisation')
+    plt.ylabel('$c_1$ additive bias')
     plt.legend(loc = 'upper center')
-    plt.savefig('Plots2/C-bias/Conf_BSM.png')
+    plt.savefig('Plots2/C-bias2/Test.png')
     return None
 
 
@@ -337,7 +335,12 @@ def cases_scatter_plot(dic,bsm, path, param):
     
     
 # cases(dic, 'Test3', bsm, val_preds, 0.5, 'aperture_sum', 'aperture sum', False)
-cases_scatter_plot(dic, bsm, 'Test3', 'e1_cal_psf')
+
+dic = Data_processing('Test', 1)
+model, history = train(dic, checkpoint_path)
+# val_preds = validate(dic, checkpoint_path)
+bsm = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
+cases_scatter_plot(dic, bsm, 'Test', 'e1_cal_psf')
 #boostFDep('sigma_mom', 'sigma moments')
 #boostFDep('rho4_mom', 'rho4 moments')
 # boostFDep('aperture_sum', 'aperture sum')

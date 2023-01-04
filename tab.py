@@ -18,13 +18,13 @@ def trunc_rayleigh(sigma, max_val, case):
     while tmp > max_val:
         tmp = np.random.rayleigh(sigma)
     return tmp
-def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, psf_pol, case, path):
+def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, case, path):
     print('case ' + str(case) + ' building table')
-    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1','psf_pol', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'rotation', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'psf_x': psf_stamp_x, 'psf_y': psf_stamp_y})
+    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'rotation', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'psf_x': psf_stamp_x, 'psf_y': psf_stamp_y})
     random_seed = 15783 + case
     rng = np.random.default_rng()
     rotation = np.linspace(0, 180, n_rot, endpoint= False)
-    shear = np.linspace(-0.06,0.06 ,n_shear)
+    shear = np.linspace(-0.01,0.01 ,n_shear)
     values = []
     count1 = 0
     for i in range(n_shear):
@@ -44,7 +44,7 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_s
         for Cancellation in values:
             e1 = e_betrag*np.cos(2*phi) 
             e2 = e_betrag*np.sin(2*phi)
-            params = [mag, n_sersic, r_half, e1, e2, Cancellation[0],psf_pol, Cancellation[2], Cancellation[3], realisation*stamp_ysize*n_shear + Cancellation[4], realisation*stamp_ysize*n_shear + Cancellation[5], dx, dy,Cancellation[1], Cancellation[6]]
+            params = [mag, n_sersic, r_half, e1, e2, Cancellation[0], Cancellation[2], Cancellation[3], realisation*stamp_ysize*n_shear + Cancellation[4], realisation*stamp_ysize*n_shear + Cancellation[5], dx, dy,Cancellation[1], Cancellation[6]]
             table.add_row(params)
         count = count + 1
     if not os.path.isdir(path):
@@ -59,33 +59,29 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, psf
     cat = galsim.Catalog('gems_20090807.fits')
     tab = Table(names = ['mag', 'n', 'r_half'], dtype = ['f4', 'f4', 'f4'])
     for i in range(cat.nobjects):
-        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 25.0) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 6.0) and (3.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
+        if ((cat.get(i, 'GEMS_FLAG')== 4) and (np.abs(cat.get(i, 'ST_MAG_BEST')-cat.get(i, 'ST_MAG_GALFIT')) < 0.5 ) and (20.5 < cat.get(i, 'ST_MAG_GALFIT') < 24.5) and (0.3 < cat.get(i, 'ST_N_GALFIT') < 6.0) and (3.0 < cat.get(i, 'ST_RE_GALFIT') <40.0)):
             params = [cat.get(i, 'ST_MAG_GALFIT'), cat.get(i, 'ST_N_GALFIT'), cat.get(i, 'ST_RE_GALFIT')*0.03]
             tab.add_row(params)
     rng = np.random.default_rng()
     tab_random = rng.choice(tab, size = n_cas)
-    psf_pol_limit = 0.01
-    psf_pols = np.linspace(psf_pol_limit,0.1,100)
-    psf_pols1 = np.linspace(-0.1,-1*psf_pol_limit,100)
-    psf_pols = np.concatenate((psf_pols, psf_pols1))
     final = []
     count = 0
     for case in tab_random:
-        psf_pol = rng.choice(psf_pols, 1)
         mag = case['mag']
         n_sersic = case['n']
         tru_sersicns = np.linspace(0.3, 6.0, 21)
         n_sersic= tru_sersicns[(np.abs(tru_sersicns-n_sersic)).argmin()]
         r_half = case['r_half']
-        params = [n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, psf_pol, count, path]
+        params = [n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, count, path]
         final.append(params)
         count = count + 1
-    with Pool() as pool:
+    with Pool(processes = 100) as pool:
             pool.starmap(tab_realisation, final)
     return None
 
-# path = config.workpath('Test')
-# training_set_tab(5, 5, 4, 5, 64, 64, 350, 380, path)
+if __name__ == "__main__":
+	path = config.workpath('Test')
+	training_set_tab(3, 10, 4, 400, 64, 64, 350, 350, path)
 
 
 # training_set_tab(2, 1, 1, 3, 64, 64,350, 350,  path)

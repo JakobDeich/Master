@@ -8,8 +8,8 @@ import analyze
 import tab
 import image
 from multiprocessing import Pool
-
 start = time.time()
+
 
 def psf_pol(psf_es, number):
     name = 'Run' + str(number) + '/PSF_es'
@@ -28,9 +28,9 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 #simulation.simulate_Grids_psf(20, 6, 'Run', '/PSF_es', 0.1)
 # simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
 
-
-simulation.generate_sim_trainingSet('Test2', 100)
-simulation.ksb_training('Test2', 100)
+if __name__ == "__main__":
+    simulation.generate_sim_trainingSet('Test2', 200)
+    simulation.ksb_training('Test2', 200)
 
 # path = config.workpath('Example')
 # tab.tab_realisation(1, 1, 1, 1, 64, 64, 350, 350, 22, 1, 1.2, 0.03, 668, path)

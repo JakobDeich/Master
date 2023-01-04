@@ -10,6 +10,7 @@ import astropy.units
 import coord
 import config
 import glob
+import threading
 # start = time.time()
 
 # table = tab.generate_table(5,5,40,40)
@@ -74,14 +75,12 @@ def generate_realisations(path_table, path, case):
     #draw random Euclid PSF and anisotropy
     PSFs_link = sorted(glob.glob('/vol/euclid5/euclid5_raid3/mtewes/Euclid_PSFs_Lance_Jan_2020/f*/sed_true*.fits'))
     PSF_indices = np.arange(len(PSFs_link), dtype=int)
-    rng = np.random.default_rng()
-    PSF_index = rng.choice(PSF_indices, size = 1)
-    # print(PSFs_link, PSF_indices, PSF_index[0])
+    rng1 = np.random.default_rng()
+    PSF_index = rng1.choice(PSF_indices, size = 1)
     PSF = galsim.fits.read(PSFs_link[PSF_index[0]], hdu = 1)
     psf = galsim.InterpolatedImage(PSF, scale = pixel_scale_small)
-    psf = psf.shear(e1 = table['psf_pol'][0])
     psf_image = galsim.ImageF(psf_stamp_x, psf_stamp_y, scale = pixel_scale_small)
-    psf.drawImage(psf_image)
+    psf.drawImage(psf_image, method = 'no_pixel')
     file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
     psf_image.write(file_name)
     for Galaxy in table:
@@ -105,12 +104,13 @@ def generate_realisations(path_table, path, case):
         final_gal = galsim.Convolve([psf,gal], gsparams = gs)
         #add noise
         if Galaxy['pixel_noise'] == 0:
-            final_gal.drawImage(sub_gal_image)
-            final_gal.drawImage(gal_blank)
-            rng = galsim.BaseDeviate(random_seed + count)
-            CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
-            sub_gal_image.addNoise(CCD_Noise)
-            Diff = sub_gal_image.array - gal_blank.array
+            with galsim.utilities.single_threaded():
+            	final_gal.drawImage(sub_gal_image)
+            	final_gal.drawImage(gal_blank)
+            	rng = galsim.BaseDeviate(random_seed + count)
+            	CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
+            	sub_gal_image.addNoise(CCD_Noise)
+            	Diff = sub_gal_image.array - gal_blank.array
         else:
             final_gal.drawImage(gal_blank)
             gal_minus = np.subtract(gal_blank.array, Diff)

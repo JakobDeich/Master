@@ -8,8 +8,9 @@ from matplotlib import cm
 from scipy.optimize import curve_fit
 from astropy.table import Table
 import os
-from astropy.table import Table, Column
+from astropy.table import Table, Column, vstack
 import time
+import ksb
 
 start = time.time()
 
@@ -19,6 +20,20 @@ def linear(x, m, b):
 def gal_mag(flux):
     return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
 
+mydir = config.workpath('Test2')
+table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
+for i in range(200):
+    if i != 5:
+        table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')
+        table = vstack([table,table1]) 
+if not os.path.isdir(mydir):
+    os.mkdir(mydir)
+file_name = os.path.join(mydir, 'Measured_ksb.fits')
+table.write( file_name , overwrite=True)     
+
+# table = Table.read(mydir + '/Input_data_5.fits')
+# ksb.calculate_ksb_training('Test2', 5)
+# print(table)
 
 # b = 1
 # gamma_cal = []
@@ -52,6 +67,7 @@ def gal_mag(flux):
 # plt.savefig('Plots2/Boost_determine_Schema.pdf')
 # print(popt[1])
 
+    
 
 
 # shear = np.linspace(-0.06, 0.06, 5)
@@ -71,10 +87,16 @@ def gal_mag(flux):
 # plt.show()
 
 
-def determine_boost(path, case):
+# mydir = config.workpath('Test3')
+# table = Table.read(mydir + '/Measured_ksb.fits')
+# plt.scatter(table['mag'], table['aperture_sum'])
+# plt.savefig('Plots2/mag_apersum.png')
+
+def determine_boost_quick(path, case):
     print('determining boost factor for case ' + str(case))
     mydir = config.workpath(path)
-    table = Table.read(mydir + '/Measured_ksb_' + str(case) + '.fits')
+    # table = Table.read(mydir + '/Measured_ksb_' + str(case) + '.fits')
+    table = Table.read(mydir + '/Measured_ksb.fits')
     # for Galaxy in table:
     #     print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'], gal_mag(Galaxy['aperture_sum']))
     #     break
@@ -88,12 +110,13 @@ def determine_boost(path, case):
         P_g11 = []
         e1 = []
         for Galaxy in table:
-            param = Galaxy['e1_cal']
-            e1.append(param)
-            param = Galaxy['anisotropy_corr']
-            e_corr.append(param)
-            param = Galaxy['Pg_11']
-            P_g11.append(param)
+            # if Galaxy['Flag'] == 0:
+                param = Galaxy['e1_cal']
+                e1.append(param)
+                param = Galaxy['anisotropy_corr']
+                e_corr.append(param)
+                param = Galaxy['Pg_11']
+                P_g11.append(param)
         e1 = np.asarray(e1)
         e_corr = np.asarray(e_corr)
         P_g11 = np.asarray(P_g11)
@@ -115,9 +138,59 @@ def determine_boost(path, case):
     # table.write( mydir + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
     return None
 
-    
-# determine_boost('Test2',3)
-# mydir = config.workpath('Test')
+def determine_boost(path, case):
+    print('determining boost factor for case ' + str(case))
+    mydir = config.workpath(path)
+    table = Table.read(mydir + '/Measured_ksb.fits')
+    # for Galaxy in table:
+    #     print(Galaxy['psf_pol'], Galaxy['anisotropy_corr'], gal_mag(Galaxy['aperture_sum']))
+    #     break
+    shears = table.meta['N_SHEAR']
+    n_rea = table.meta['N_REA']
+    n_canc = table.meta['N_CANC']
+    bsm = np.linspace(1.,1.4,3)
+    gamma = np.linspace(-0.01,0.01,3)
+    cs = []
+    for b in bsm:
+        gamma_cal = []
+        for j in gamma:
+            e_corr = []
+            P_g11 = []
+            e1 = []
+            for Galaxy in table:
+                if (Galaxy['gamma1']-10**(-4)) <= j and (Galaxy['gamma1']+10**(-4)) >= j and Galaxy['Flag'] == 0:
+                    param = Galaxy['e1_cal']
+                    e1.append(param)
+                    param = Galaxy['anisotropy_corr']
+                    e_corr.append(param)
+                    param = Galaxy['Pg_11']
+                    P_g11.append(param)
+            e1 = np.asarray(e1)
+            e_corr = np.asarray(e_corr)
+            P_g11 = np.asarray(P_g11)
+            mean1 = np.mean(e1- b * e_corr)
+            mean2 = np.mean(P_g11)
+            gamma_cal.append(mean1/mean2)
+        popt, pcov = curve_fit(linear, gamma, gamma_cal)
+        bias = popt[1]
+        cs.append(bias) 
+    popt, pcov = curve_fit(linear, bsm, cs)
+    m2 = popt[0]
+    b2 = popt[1]
+    print(-1*b2/m2)
+    # Col_A = Column(name = 'b_sm', data = tab)
+    # try:
+    #     table.add_columns([Col_A])
+    # except:
+    #     table.replace_column(name = 'b_sm', col = Col_A)
+    # table.write( mydir + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
+    return None
+
+
+# determine_boost_quick('Test3',3)
+# mydir = config.workpath('Test3')
+# determine_boost_quick(mydir , 0)
+# determine_boost(mydir , 0)
 # # table = Table.read(mydir + '/Measured_ksb.fits')
 # table = Table.read(mydir + '/Input_data_17.fits')
 # print(table)
