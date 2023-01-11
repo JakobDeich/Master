@@ -21,15 +21,20 @@ def gal_mag(flux):
     return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
 
 mydir = config.workpath('Test2')
-table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'f4'])
+# table = Table.read(mydir + '/Input_data_120.fits')
+# print(np.mean(table['mag']))
 for i in range(200):
-    if i != 5:
-        table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')
-        table = vstack([table,table1]) 
-if not os.path.isdir(mydir):
-    os.mkdir(mydir)
-file_name = os.path.join(mydir, 'Measured_ksb.fits')
-table.write( file_name , overwrite=True)     
+    table1 = Table.read(mydir + '/Input_data_'+ str(i) + '.fits')
+    if np.mean(table1['mag']) < 21:
+        print(i)
+# table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2','Q111_psf','Q222_psf', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4','f4','f4', 'f4', 'f4', 'f4'])
+# for i in range(200):
+#     table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')
+#     table = vstack([table,table1]) 
+# if not os.path.isdir(mydir):
+#     os.mkdir(mydir)
+# file_name = os.path.join(mydir, 'Measured_ksb.fits')
+# table.write( file_name , overwrite=True)     
 
 # table = Table.read(mydir + '/Input_data_5.fits')
 # ksb.calculate_ksb_training('Test2', 5)

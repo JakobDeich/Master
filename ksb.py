@@ -300,13 +300,17 @@ def calculate_ksb_training(path, case):
             sub_gal_image = gal_image[b]
             sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
             meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = sigw_sub)
-            try:
+            if meas_on_galaxy is None:
+                e1_anisotropy_correction = -10
+                P_g11 = -10
+                e1 = -10
+                e2 = -10
+            else:
                 e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
-            except:
-                print('error at case: ' + str(case) + ' and galaxy ' + str(count))
-            #e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
-            P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
-            #P_g22 = meas_on_galaxy['Psh22']-meas_on_galaxy['Psm22']/meas_on_psf['Psm22']*meas_on_psf['Psh22']
+                #e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
+                P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
+                e1 = meas_on_galaxy['e1']
+                e2 = meas_on_galaxy['e2']
             phot_table = aperture_photometry(sub_gal_image.array, aperture)
             cat = data_properties(sub_gal_image.array)
             columns = ['label', 'xcentroid', 'ycentroid', 'semimajor_sigma','semiminor_sigma', 'orientation']
@@ -318,7 +322,7 @@ def calculate_ksb_training(path, case):
             tab1.append(Radius)
             tab2.append(P_g11)
             tab3.append(e1_anisotropy_correction)
-            tab4.append(meas_on_galaxy['e1'])
+            tab4.append(e1)
             tab5.append(phot_table['aperture_sum'])
             tab6.append(meas_on_psf['Q111'])
             tab7.append(my_moments.moments_sigma)
@@ -326,7 +330,7 @@ def calculate_ksb_training(path, case):
             tab8.append(my_moments.moments_rho4)
             tab9.append(meas_on_psf['e1'])
             tab11.append(meas_on_psf['e2'])
-            tab12.append(meas_on_galaxy['e2'])
+            tab12.append(e2)
             tab13.append(meas_on_psf['Q222'])
             count = count + 1
         Col_A = Column(name = 'Pg_11', data = tab2)
@@ -364,8 +368,8 @@ def calculate_ksb_training(path, case):
         logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
-# path = config.workpath('Test2')
-# calculate_ksb_training(path, 0)
+path = config.workpath('Test2')
+calculate_ksb_training(path, 176)
 # calculate_ksb_training(path, 1)
 # calculate_ksb_training(path, 2)
 # calculate_ksb_training(path, 3)
