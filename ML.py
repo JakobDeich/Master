@@ -14,7 +14,7 @@ from astropy.table import Table
 # import ML_Tensorflow.python.ML_Tensorflow
 matplotlib.use('Tkagg')
 import tensorflow as tf
-    
+from astropy.table import Table
 import logging
 
 # aper = np.ones(30)*400
@@ -70,7 +70,11 @@ def oneD_to_threeD(path, parameter, ncas, nreas, case_percentage):
             array2[i][j][0] = table[j][parameter]    
     return array, array2
 
-def preprocessing(path):
+def split_list(a_list):
+    half = len(a_list)//2
+    return a_list[:half], a_list[half:]
+
+def preprocessing(path, include_validation, val):
     print('start filtering')
     mydir = config.workpath(path)
     table = Table.read(mydir + '/Measured_ksb.fits')
@@ -81,25 +85,31 @@ def preprocessing(path):
         table1 =Table.read(path2)
         if min(table1['e1_cal']) > -9:
             fine_cases.append(i)
-    print('finish filtering')
-    return fine_cases
+    if include_validation == True:
+        fine_cases_train, fine_cases_val = split_list(fine_cases)
+        if val ==True:
+            print('finish filtering with length: ' + str(len(fine_cases_val)))
+            return fine_cases_val
+        else:
+            print('finish filtering with length: ' + str(len(fine_cases_train)))
+            return fine_cases_train
+    else:
+        print('finish filtering with length: ' + str(len(fine_cases)))
+        return fine_cases
             
             
     
 
-def Data_processing(path, higher_mom = False):
+def Data_processing(path, include_validation = False, val = False):
     print('start preprocessing')
     dic = {}
     mydir = config.workpath(path)
     table = Table.read(mydir + '/Measured_ksb.fits')
     ncas = table.meta['N_CAS']
-    Training = preprocessing(path)
+    Training = preprocessing(path, include_validation, val)
     ncas = len(Training)
     nreas = table.meta['N_REA']*table.meta['N_CANC']
-    if higher_mom == False:
-        feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf']
-    else:
-        feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf', 'Q111_psf', 'Q222_psf']
+    feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf', 'e2_cal', 'e2_cal_psf']
     #feas = ['aperture_sum','sigma_mom']
     ac = np.zeros((ncas, nreas,1))
     e1 = np.zeros((ncas, nreas,1))
@@ -205,7 +215,9 @@ def train(dic, checkpoint_path, epochs):
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
             filepath=checkpoint_path,
             save_weights_only=True,
-            verbose=1)
+            verbose=0,
+            save_freq='epoch')
+    model.save_weights(checkpoint_path.format(epoch=0))
     history = model.fit(
             [dic['features'], dic['e1_cal'], dic['anisotropy_corr']], 
             None, 
@@ -224,7 +236,6 @@ def validate(dic, checkpoint_path):
             metrics = [])
     model.load_weights(checkpoint_path)
     loss = model.evaluate([dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
-    print(loss)
     val_preds = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
     return val_preds
 
@@ -299,10 +310,11 @@ def cases_scatter_plot(dic,bsm, path, param, label, non_boost=True):
     # plt.scatter(dic1['param_mean'], dic1['e2_mean'], label = '$b^{sm} = 1$')
     plt.scatter(dic1['param_mean'], dic1['e_mean'], marker = '.', label = label)
     plt.xlabel('$e_1^{PSF}$ psf polarisation')
+    # plt.xlabel('aperture sum')
     plt.ylabel('$c_1$ additive bias')
     plt.tight_layout()
     plt.legend(loc = 'upper center')
-    plt.savefig('Plots2/C-bias2/test_and_validation.png')
+    # plt.savefig('Plots2/C-bias2/training_example.png')
     return None
 
 
@@ -327,37 +339,39 @@ def cases_scatter_plot(dic,bsm, path, param, label, non_boost=True):
 # plt.show()
     
     
-# cases(dic, 'Test3', bsm, val_preds, 0.5, 'aperture_sum', 'aperture sum', False)
-dic6 = Data_processing('Test2', False)
-model, history = train(dic6, checkpoint_path, 1000)
-# val_preds = validate(dic, checkpoint_path)
-bsm = model.predict(x = [dic6['features'], dic6['e1_cal'], dic6['anisotropy_corr']])
-e = dic6['e1_cal']- bsm *dic6['anisotropy_corr']
-e_no = dic6['e1_cal']- dic6['anisotropy_corr']
-dic5 = mean_of(dic6['n_cas'], e, e_no, e)
-# cases_scatter_plot(dic, bsm, 'Test', 'e1_cal_psf','training set estimate', False)
-dic = Data_processing('Test2', True)
-model2, history2 = train(dic, checkpoint_path, 1000)
-# val_preds = validate(dic, checkpoint_path)
-bsm2 = model2.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
-e = dic['e1_cal']- bsm2 *dic['anisotropy_corr']
-e_no = dic['e1_cal']- dic['anisotropy_corr']
-dic1 = mean_of(dic['n_cas'], e, e_no, e)
-# cases_scatter_plot(dic, bsm, 'Test', 'e1_cal_psf','training set estimate', False)
-# dic2 = Data_processing('Test',1)
-# bsm_val = validate(dic2, checkpoint_path)
-# e = dic2['e1_cal']- bsm_val *dic2['anisotropy_corr']
-# e_no = dic2['e1_cal']- dic2['anisotropy_corr']
-# dic3 = mean_of(200, e, e_no, e)
-bar = [np.mean(np.square(dic5['e_mean'])), np.mean(np.square(dic5['e2_mean'])),np.mean(np.square(dic1['e_mean'])), np.mean(np.square(dic1['e2_mean']))]
-y_pos = np.arange(len(bar))
-plt.bar(y_pos, bar, align='center', color = ['b', 'b', 'r', 'r'])
-#bar_name = ['trained $b_{sm}$ smaller sample', '$b_{sm} = 1$ with training data smaller sample','trained $b_{sm}$', '$b_{sm} = 1$ with training data', 'validated $b_{sm}$', '$b_{sm} = 1$ with validation data']
-bar_name = ['trained $b_{sm}$', '$b_{sm} = 1$ with training data','trained $b_{sm}$ with \n higher PSF moments', '$b_{sm} = 1$ with \n higher PSF moments']
-plt.xticks(y_pos, bar_name)
-plt.ylabel('loss function')
-plt.show()
-plt.savefig('Plots2/C-bias2/higher_moments.png')
+# dic6 = Data_processing('Test4', True, True, False)
+# model, history = train(dic6, checkpoint_path, 3500)
+# dic7 = Data_processing('Test4', True, True, True)
+# val_preds = validate(dic7, checkpoint_path)
+# bsm = model.predict(x = [dic6['features'], dic6['e1_cal'], dic6['anisotropy_corr']])
+# e = dic6['e1_cal']- bsm *dic6['anisotropy_corr']
+# e_no = dic6['e1_cal']- dic6['anisotropy_corr']
+# dic5 = mean_of(dic6['n_cas'], e, e_no, e)
+# e = dic7['e1_cal']- val_preds *dic7['anisotropy_corr']
+# e_no = dic7['e1_cal']- dic7['anisotropy_corr']
+# dic2 = mean_of(dic7['n_cas'], e, e_no, e)
+# dic = Data_processing('Test2', True, True, False)
+# model2, history2 = train(dic, checkpoint_path, 3500)
+# dic8 = Data_processing('Test2', True, True, True)
+# val_preds2 = validate(dic8, checkpoint_path)
+# bsm2 = model2.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
+# e = dic['e1_cal']- bsm2 *dic['anisotropy_corr']
+# e_no = dic['e1_cal']- dic['anisotropy_corr']
+# dic1 = mean_of(dic['n_cas'], e, e_no, e)
+# e = dic8['e1_cal']- val_preds2 *dic8['anisotropy_corr']
+# e_no = dic8['e1_cal']- dic8['anisotropy_corr']
+# dic3 = mean_of(dic8['n_cas'], e, e_no, e)
+
+
+# bar = [np.mean(np.square(dic5['e_mean'])), np.mean(np.square(dic5['e2_mean'])),np.mean(np.square(dic2['e_mean'])), np.mean(np.square(dic2['e2_mean'])),np.mean(np.square(dic1['e_mean'])), np.mean(np.square(dic1['e2_mean'])), np.mean(np.square(dic3['e_mean'])), np.mean(np.square(dic3['e2_mean']))]
+# y_pos = np.arange(len(bar))
+# plt.bar(y_pos, bar, align='center', color = ['b', 'b', 'r', 'r', 'g', 'g'])
+# #bar_name = ['trained $b_{sm}$ smaller sample', '$b_{sm} = 1$ with training data smaller sample','trained $b_{sm}$', '$b_{sm} = 1$ with training data', 'validated $b_{sm}$', '$b_{sm} = 1$ with validation data']
+# bar_name = ['trained $b_{sm}$ \n more rotation', 'trained $b_{sm} = 1$ \n more rotation','validated $b_{sm}$ \n more rotation', 'validated $b_{sm} = 1$ \n more rotation','trained $b_{sm}$', '$b_{sm} = 1$', 'validated \n $b_{sm}$', 'validated \n $b_{sm} = 1$']
+# plt.xticks(y_pos, bar_name)
+# plt.ylabel('loss function')
+# plt.show()
+# plt.savefig('Plots2/C-bias2/more_rotation_epochs_validation3.png')
 
 # cases_scatter_plot(dic2, bsm_val, 'Test2', 'e1_cal_psf','validation set estimate')
 #boostFDep('sigma_mom', 'sigma moments')
@@ -366,8 +380,67 @@ plt.savefig('Plots2/C-bias2/higher_moments.png')
 # print(e/P_g, e2/P_g)
 # print(model.evaluate(x = [features, e1, ac], y = None))
 # print(bsm)
-# plt.plot(range(500), (history.history['loss']), label = 'small data')
-# plt.plot(range(1500), (history2.history['loss']), label = 'big data')
+
+dic6 = Data_processing('Test4')
+# model, history = train(dic6, checkpoint_path, 1500)
+# # dic7 = Data_processing('Test2')
+# # val_preds = validate(dic7, checkpoint_path)
+# bsm = model.predict(x = [dic6['features'], dic6['e1_cal'], dic6['anisotropy_corr']])
+path = config.workpath('Test4')
+# file_name = os.path.join(path, 'BSM_new.fits')
+# t = Table([bsm], names = ['bsm'], dtype =['f4'])
+# t.write(file_name, overwrite = True)
+table = Table.read(path + '/BSM.fits')
+dic = mean_of(200, np.ones((200,48000,1)), np.ones((200,48000,1)), table['bsm'])
+dic2 = mean_of(200, np.ones((200,48000,1)), np.ones((200,48000,1)), dic6['features'][:,:,2])
+plt.scatter(dic2['param_mean'], dic['param_mean'], marker = '.')
+plt.ylabel('boost factor')
+plt.xlabel('rho 4 moments')
+# cases_scatter_plot(dic6, table['bsm'], 'Test4', 'e1_cal_psf','training set estimate')
+
+
+
+
+# e = dic6['e1_cal']- bsm *dic6['anisotropy_corr']
+# e_no = dic6['e1_cal']- dic6['anisotropy_corr']
+# dic5 = mean_of(dic6['n_cas'], e, e_no, e)
+# e = dic7['e1_cal']- val_preds *dic7['anisotropy_corr']
+# e_no = dic7['e1_cal']- dic7['anisotropy_corr']
+# dic8 = mean_of(dic7['n_cas'], e, e_no, e)
+# print(np.mean(abs(dic5['e_mean']))/np.mean(abs(dic5['e2_mean'])))
+# print(np.mean(abs(dic8['e_mean']))/np.mean(abs(dic8['e2_mean'])))
+# cases_scatter_plot(dic6, 1, 'Test4', 'e1_cal_psf', 'training estimate')
+# path = config.workpath('Comparison')
+# table = Table.read(path + '/Measured_ksb.fits')
+# # feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf', 'Q111_psf', 'Q222_psf']
+# feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf']
+# feats = np.zeros((table.meta['N_CAS'],1,len(feas)))
+# e1 = np.zeros((table.meta['N_CAS'],1,1))
+# ac = np.zeros((table.meta['N_CAS'],1,1))
+# fea_max = np.zeros(len(feas))
+# for count,i in enumerate(feas):
+#     fea_max[count] = max(abs(table[i]))
+# for i, Galaxy in enumerate(table):
+#     e1[i] = Galaxy['e1_cal']
+#     ac[i] = Galaxy['anisotropy_corr']
+#     for j,k in enumerate(feas):
+#         feats[i,0,j] = Galaxy[k]/fea_max[j]
+# bsm = test(feats, e1, ac, 1 , len(feas), checkpoint_path)
+
+# bar = [np.mean(abs(e1-bsm*ac)), np.mean(abs(e1-ac))]
+# y_pos = np.arange(len(bar))
+# plt.bar(y_pos, bar, align='center', color = ['b', 'r'])
+# #bar_name = ['trained $b_{sm}$ smaller sample', '$b_{sm} = 1$ with training data smaller sample','trained $b_{sm}$', '$b_{sm} = 1$ with training data', 'validated $b_{sm}$', '$b_{sm} = 1$ with validation data']
+# bar_name = ['ML $b_{sm}$', '$b_{sm} = 1$']
+# plt.xticks(y_pos, bar_name)
+# plt.ylabel('c-bias estimate')
+# plt.show()
+# plt.savefig('Plots2/C-bias2/testing.png')
+# print(np.mean((e1-bsm*ac)**2), np.mean((e1-ac)**2))
+# 0.07293662008416374
+
+# plt.plot(range(750,1500), (history.history['loss'][750:1500]), label = 'big data')
+# plt.plot(range(750,1500), (history2.history['loss'][750:1500]), label = 'small data')
 # plt.xlabel('epochs')
 # plt.ylabel('loss')
 # plt.legend()

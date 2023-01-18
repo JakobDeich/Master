@@ -173,73 +173,92 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
     # e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
 def calculate_ksb(path):
     sigw_sub = 10 
-    image.generate_psf_image(path)
-    PSF = galsim.fits.read(path + '/PSF.fits')
-    meas_on_psf = ksb_moments(PSF.array, sigw = sigw_sub)
     log_format = '%(asctime)s %(filename)s: %(message)s'
     logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
     table = Table.read(path + '/Input_data.fits')
     logging.info('Read in table from %s /table.fits' %path)
     image_file = path + '/Grid.fits'
+    psf_image_file = path + '/PSFs.fits'
     gal_image = galsim.fits.read(image_file)
+    psf_image = galsim.fits.read(psf_image_file)
     stamp_x_size = table.meta['STAMP_X']
     stamp_y_size = table.meta['STAMP_Y']
-    tab = []
-    tab2 = []
-    tab3 = []
-    tab4 = []
-    tab5 = []
-    tab6 = []
-    tab7 = []
-    tab8 = []
+    tab1  = []
+    tab2  = []
+    tab3  = []
+    tab4  = []
+    tab5  = []
+    tab6  = []
+    tab7  = []
+    tab8  = []
+    tab9  = []
+    tab10 = []
+    tab11 = []
+    tab12 = []
+    tab13 = []
     logging.info('start ksb algorithm')
     count = 0
     positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
     aperture = CircularAperture(positions, r=sigw_sub)
-    aperture2 =  CircularAperture(positions, r=sigw_sub*1.5)
     for Galaxy in table:        
         if count%1000==0:
             logging.warning('Galaxy number %i' %count)
             print(str(count) + ' Galaxies examined')
         b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
         sub_gal_image = gal_image[b] 
+        sub_psf_image = psf_image[b]
         sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
+        meas_on_psf = ksb_moments(sub_psf_image.array, sigw = sigw_sub)
+        my_moments_psf = galsim.hsm.FindAdaptiveMom(sub_psf_image, guess_sig = 10, strict = (False))
         meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = sigw_sub)
-        e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
-        #e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
-        P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
-        #P_g22 = meas_on_galaxy['Psh22']-meas_on_galaxy['Psm22']/meas_on_psf['Psm22']*meas_on_psf['Psh22']
+        if meas_on_galaxy is None:
+            e1_anisotropy_correction = -10
+            P_g11 = -10
+            e1 = -10
+            e2 = -10
+        else:
+            e1_anisotropy_correction = (meas_on_galaxy['Psm11'] * (meas_on_psf['e1']/meas_on_psf['Psm11']))
+            #e2_anisotropy_correction = (meas_on_galaxy['Psm22'] * (meas_on_psf['e2']/meas_on_psf['Psm22']))
+            P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
+            e1 = meas_on_galaxy['e1']
+            e2 = meas_on_galaxy['e2']
         phot_table = aperture_photometry(sub_gal_image.array, aperture)
-        phot_table2 = aperture_photometry(sub_gal_image.array, aperture2)
         cat = data_properties(sub_gal_image.array)
         columns = ['label', 'xcentroid', 'ycentroid', 'semimajor_sigma','semiminor_sigma', 'orientation']
         tbl = cat.to_table(columns=columns)
         a = tbl['semimajor_sigma'] 
         b = tbl['semiminor_sigma'] 
-        my_moments = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 10, strict = (False))
+        my_moments = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 10, strict = (False)) 
         Radius = np.sqrt( a * b )
-        tab.append(Radius)
+        tab1.append(Radius)
         tab2.append(P_g11)
         tab3.append(e1_anisotropy_correction)
-        tab4.append(meas_on_galaxy['e1'])
+        tab4.append(e1)
         tab5.append(phot_table['aperture_sum'])
-        if phot_table['aperture_sum'] > 600:
-            tab6.append(0)
-        else:
-            tab6.append(1)
+        tab6.append(meas_on_psf['Q111'])
         tab7.append(my_moments.moments_sigma)
+        tab10.append(my_moments_psf.moments_sigma)
         tab8.append(my_moments.moments_rho4)
-        count = count + 1 
+        tab9.append(meas_on_psf['e1'])
+        tab11.append(meas_on_psf['e2'])
+        tab12.append(e2)
+        tab13.append(meas_on_psf['Q222'])
+        count = count + 1
     Col_A = Column(name = 'Pg_11', data = tab2)
     Col_B = Column(name = 'anisotropy_corr', data = tab3)
     Col_C = Column(name = 'e1_cal', data = tab4)
     Col_D = Column(name = 'aperture_sum', data = tab5)
-    Col_E = Column(name = 'radius_est', data = tab)
-    Col_F = Column(name = 'Flag', data = tab6)
+    Col_E = Column(name = 'radius_est', data = tab1)
+    Col_F = Column(name = 'Q111_psf', data = tab6)
     Col_G = Column(name = 'sigma_mom', data = tab7)
     Col_H = Column(name = 'rho4_mom', data = tab8)
+    Col_I = Column(name = 'sigma_mom_psf', data = tab10)
+    Col_J = Column(name = 'e1_cal_psf', data = tab9)
+    Col_K = Column(name = 'e2_cal_psf', data = tab11)
+    Col_L = Column(name = 'e2_cal', data = tab12)
+    Col_M = Column(name = 'Q222_psf', data = tab13)
     try:
-        table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H])
+        table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H, Col_I, Col_J, Col_K, Col_L, Col_M])
         logging.info('Add columns to table')
     except:
         table.replace_column(name = 'Pg_11', col = Col_A)
@@ -247,15 +266,20 @@ def calculate_ksb(path):
         table.replace_column(name = 'e1_cal', col = Col_C)
         table.replace_column(name = 'aperture_sum', col = Col_D)
         table.replace_column(name = 'radius_est', col = Col_E)
-        table.replace_column(name = 'Flag', col = Col_F)
+        table.replace_column(name = 'Q111_psf', col = Col_F)
         table.replace_column(name = 'sigma_mom', col = Col_G)
         table.replace_column(name = 'rho4_mom', col = Col_H)
+        table.replace_column(name = 'sigma_mom_psf', col = Col_I)
+        table.replace_column(name = 'e1_cal_psf', col = Col_J)
+        table.replace_column(name = 'e2_cal_psf', col = Col_K)
+        table.replace_column(name = 'e2_cal', col = Col_L)
+        table.replace_column(name = 'Q222_psf', col = Col_M)
         logging.info('replaced columns in table')
     table.write( path + '/Measured_ksb.fits' , overwrite=True) 
     logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
-def calculate_ksb_training(path, case):
+def calculate_ksb_training(path, case, trys):
     with galsim.utilities.single_threaded(): 
         sigw_sub = 10 
         path = config.workpath(path)
@@ -263,7 +287,8 @@ def calculate_ksb_training(path, case):
         logging.basicConfig(filename='ksb.log', format=log_format, level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
         table = Table.read(path + '/Input_data_' + str(case) + '.fits')
         logging.info('Read in table from %s /table.fits' %path)
-        image_file = path + '/Grid_case' + str(case) + '.fits'
+        # image_file = path + '/Grid_case' + str(case) + '.fits'
+        image_file = path + 'Grid_case' + str(case) + '_' + str(trys) + '.fits'
         gal_image = galsim.fits.read(image_file)
         stamp_x_size = table.meta['STAMP_X']
         stamp_y_size = table.meta['STAMP_Y']
@@ -364,12 +389,12 @@ def calculate_ksb_training(path, case):
             table.replace_column(name = 'e2_cal', col = Col_L)
             table.replace_column(name = 'Q222_psf', col = Col_M)
             logging.info('replaced columns in table')
-        table.write( path + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
+        table.write( path + '/Measured_ksb_' + str(case) + '_' + str(trys) + '.fits' , overwrite=True) 
         logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
-path = config.workpath('Test2')
-calculate_ksb_training(path, 176)
+#path = config.workpath('Test2')
+#calculate_ksb_training(path, 176)
 # calculate_ksb_training(path, 1)
 # calculate_ksb_training(path, 2)
 # calculate_ksb_training(path, 3)
