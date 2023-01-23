@@ -20,13 +20,41 @@ def linear(x, m, b):
 def gal_mag(flux):
     return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
 
-mydir = config.workpath('Test2')
+# path = config.workpath('Test4')
+# cases = [0,20,30,40,50, 60, 70]
+# trys =np.arange(25)
+# for j in cases:
+#     for i in trys:
+#         try:
+#             image_file = path + '/Grid_case' + str(j) +'_' + str(i) + '.fits'
+#             gal_image = galsim.fits.read(image_file)
+#         except:
+#             print(j, i)
+
+path = config.workpath('Test4')
+# cases = [0,20,30,40,50, 60, 70]
+cases = [5,10,15]
+# trys = np.arange(25)
+trys = np.arange(10)
+for j in cases:
+    pol = []
+    param = []
+    for i in trys:
+        table = Table.read(path + '/Measured_ksb_' + str(j) +'_' + str(i) + '.fits')
+        # table = Table.read(path + '/Measured_ksb_' + str(j) + '.fits')
+        pol.append(np.mean(table['e1_cal']-table['anisotropy_corr']))
+        param.append(np.mean(table['sigma_mom']))
+    pol_mean = np.mean(pol)
+    stabw = np.sum((pol-pol_mean)**2)/len(pol)
+    stabw = np.sqrt(stabw)
+    plt.scatter(param,pol, marker = '.', label = 'case ' + str(j))
+    plt.errorbar(np.mean(param), pol_mean, yerr = stabw, fmt = 'x',label = 'mean case ' + str(j) + ' with standard deviation')
+plt.legend()
+plt.xlabel('sigma moments')
+plt.ylabel('additive bias')
+
 # table = Table.read(mydir + '/Input_data_120.fits')
 # print(np.mean(table['mag']))
-for i in range(200):
-    table1 = Table.read(mydir + '/Input_data_'+ str(i) + '.fits')
-    if np.mean(table1['mag']) < 21:
-        print(i)
 # table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2','Q111_psf','Q222_psf', 'gamma1', 'b_sm'], dtype = ['f4', 'f4', 'f4', 'f4','f4','f4', 'f4', 'f4', 'f4'])
 # for i in range(200):
 #     table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')

@@ -53,7 +53,7 @@ def generate_psf_image(path):
     psf_image.write(file_name)
     return None
 
-def generate_realisations(path, case, trys):
+def generate_realisations(path, case):
     random_seed = 15783
     table = Table.read(path + '/Input_data_' + str(case) + '.fits')
     stamp_xsize = table.meta['STAMP_X']
@@ -108,6 +108,76 @@ def generate_realisations(path, case, trys):
             	final_gal.drawImage(sub_gal_image)
             	final_gal.drawImage(gal_blank)
             	rng = galsim.BaseDeviate(random_seed + count)
+            	CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
+            	sub_gal_image.addNoise(CCD_Noise)
+            	Diff = sub_gal_image.array - gal_blank.array
+        else:
+            final_gal.drawImage(gal_blank)
+            gal_minus = np.subtract(gal_blank.array, Diff)
+            gal_image[b] = galsim.Image(gal_minus)
+        count = count + 1
+    if not os.path.isdir(path):
+            os.mkdir(path)
+    file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
+    gal_image.write(file_name)
+    return None
+
+
+def generate_realisations_trys(path, case, trys):
+    random_seed = 15783
+    table = Table.read(path + '/Input_data_' + str(case) + '.fits')
+    stamp_xsize = table.meta['STAMP_X']
+    stamp_ysize = table.meta['STAMP_Y']
+    psf_stamp_x = table.meta['PSF_X']
+    psf_stamp_y = table.meta['PSF_Y']
+    n_shear = table.meta['N_SHEAR']
+    n_rot = table.meta['N_ROT']
+    n_rea = table.meta['N_REA']
+    # print(table['bound_y_bottom'])
+    pixel_scale = 0.1 #arcsec/pixel 
+    pixel_scale_small = 0.02
+    mag_sky = 22.35
+    Sky_flux = sky_flux(mag_sky)
+    gain = 3.1 #e/ADU
+    gal_image = galsim.ImageF((stamp_xsize *n_rot *2), stamp_ysize *n_shear *n_rea, scale = pixel_scale)
+    #creating the grid and placing galaxies on it
+    count = 0
+    #draw random Euclid PSF and anisotropy
+    PSFs_link = sorted(glob.glob('/vol/euclid5/euclid5_raid3/mtewes/Euclid_PSFs_Lance_Jan_2020/f*/sed_true*.fits'))
+    PSF_indices = np.arange(len(PSFs_link), dtype=int)
+    rng1 = np.random.default_rng()
+    PSF_index = rng1.choice(PSF_indices, size = 1)
+    PSF = galsim.fits.read(PSFs_link[PSF_index[0]], hdu = 1)
+    psf = galsim.InterpolatedImage(PSF, scale = pixel_scale_small)
+    psf_image = galsim.ImageF(psf_stamp_x, psf_stamp_y, scale = pixel_scale_small)
+    psf.drawImage(psf_image, method = 'no_pixel')
+    file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
+    psf_image.write(file_name)
+    for Galaxy in table:
+        gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
+        if count%2000==0:
+            print(count, case)
+        flux = gal_flux(Galaxy['mag'])
+        #define galaxy with sersic profile
+        gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
+        gal = galsim.Sersic(Galaxy['n'], half_light_radius = Galaxy['r_half'], flux = flux)
+        gal = gal.shear(e1=Galaxy['e1'], e2=Galaxy['e2'])
+        #create grid
+        b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
+        sub_gal_image = gal_image[b] 
+        #shift galaxies and psfs on the grid
+        gal = gal.shift(Galaxy['pixel_shift_x'], Galaxy['pixel_shift_y'])
+        gal = gal.rotate(galsim.Angle(theta = Galaxy['rotation'], unit = coord.degrees))
+        #shear galaxy
+        gal = gal.shear(g1 = Galaxy['gamma1'])
+        #convolve galaxy and psf 
+        final_gal = galsim.Convolve([psf,gal], gsparams = gs)
+        #add noise
+        if Galaxy['pixel_noise'] == 0:
+            with galsim.utilities.single_threaded():
+            	final_gal.drawImage(sub_gal_image)
+            	final_gal.drawImage(gal_blank)
+            	rng = galsim.BaseDeviate(random_seed + count + case*3 + trys*5)
             	CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
             	sub_gal_image.addNoise(CCD_Noise)
             	Diff = sub_gal_image.array - gal_blank.array
