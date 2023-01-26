@@ -55,6 +55,8 @@ def generate_psf_image(path):
 
 def generate_realisations(path, case):
     random_seed = 15783
+    with galsim.utilities.single_threaded():
+        rng = galsim.BaseDeviate()
     table = Table.read(path + '/Input_data_' + str(case) + '.fits')
     stamp_xsize = table.meta['STAMP_X']
     stamp_ysize = table.meta['STAMP_Y']
@@ -84,9 +86,9 @@ def generate_realisations(path, case):
     file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
     psf_image.write(file_name)
     for Galaxy in table:
-        gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
         if count%2000==0:
             print(count, case)
+        gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
@@ -105,21 +107,26 @@ def generate_realisations(path, case):
         #add noise
         if Galaxy['pixel_noise'] == 0:
             with galsim.utilities.single_threaded():
-            	final_gal.drawImage(sub_gal_image)
-            	final_gal.drawImage(gal_blank)
-            	rng = galsim.BaseDeviate(random_seed + count)
-            	CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
-            	sub_gal_image.addNoise(CCD_Noise)
-            	Diff = sub_gal_image.array - gal_blank.array
+                gal_test = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
+                final_gal.drawImage(sub_gal_image)
+                final_gal.drawImage(gal_blank)
+                final_gal.drawImage(gal_test)
+                CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
+                sub_gal_image.addNoise(CCD_Noise)
+                gal_test.addNoise(CCD_Noise)
+                Diff = gal_test.array - gal_blank.array
         else:
             final_gal.drawImage(gal_blank)
             gal_minus = np.subtract(gal_blank.array, Diff)
             gal_image[b] = galsim.Image(gal_minus)
+            # nul = (np.subtract(np.add(gal_minus,gal_test.array), 2*gal_blank.array))
+            # print(nul)
+            # break
         count = count + 1
-    if not os.path.isdir(path):
-            os.mkdir(path)
-    file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
-    gal_image.write(file_name)
+    # if not os.path.isdir(path):
+    #         os.mkdir(path)
+    # file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
+    # gal_image.write(file_name)
     return None
 
 
@@ -143,16 +150,18 @@ def generate_realisations_trys(path, case, trys):
     #creating the grid and placing galaxies on it
     count = 0
     #draw random Euclid PSF and anisotropy
-    PSFs_link = sorted(glob.glob('/vol/euclid5/euclid5_raid3/mtewes/Euclid_PSFs_Lance_Jan_2020/f*/sed_true*.fits'))
-    PSF_indices = np.arange(len(PSFs_link), dtype=int)
-    rng1 = np.random.default_rng()
-    PSF_index = rng1.choice(PSF_indices, size = 1)
-    PSF = galsim.fits.read(PSFs_link[PSF_index[0]], hdu = 1)
-    psf = galsim.InterpolatedImage(PSF, scale = pixel_scale_small)
-    psf_image = galsim.ImageF(psf_stamp_x, psf_stamp_y, scale = pixel_scale_small)
-    psf.drawImage(psf_image, method = 'no_pixel')
+    # PSFs_link = sorted(glob.glob('/vol/euclid5/euclid5_raid3/mtewes/Euclid_PSFs_Lance_Jan_2020/f*/sed_true*.fits'))
+    # PSF_indices = np.arange(len(PSFs_link), dtype=int)
+    # rng1 = np.random.default_rng()
+    # PSF_index = rng1.choice(PSF_indices, size = 1)
+    # PSF = galsim.fits.read(PSFs_link[PSF_index[0]], hdu = 1)
     file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
-    psf_image.write(file_name)
+    PSF = galsim.fits.read(file_name)
+    psf = galsim.InterpolatedImage(PSF, scale = pixel_scale_small)
+    # psf.drawImage(psf_image, method = 'no_pixel')
+    with galsim.utilities.single_threaded():
+        rng = galsim.BaseDeviate()
+    # psf_image.write(file_name)
     for Galaxy in table:
         gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
         if count%2000==0:
@@ -175,12 +184,14 @@ def generate_realisations_trys(path, case, trys):
         #add noise
         if Galaxy['pixel_noise'] == 0:
             with galsim.utilities.single_threaded():
-            	final_gal.drawImage(sub_gal_image)
-            	final_gal.drawImage(gal_blank)
-            	rng = galsim.BaseDeviate(random_seed + count + case*3 + trys*5)
-            	CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
-            	sub_gal_image.addNoise(CCD_Noise)
-            	Diff = sub_gal_image.array - gal_blank.array
+                gal_test = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
+                final_gal.drawImage(sub_gal_image)
+                final_gal.drawImage(gal_blank)
+                final_gal.drawImage(gal_test)
+                CCD_Noise = galsim.CCDNoise(rng, sky_level = Sky_flux, gain = gain, read_noise = 4.2)
+                sub_gal_image.addNoise(CCD_Noise)
+                gal_test.addNoise(CCD_Noise)
+                Diff = gal_test.array - gal_blank.array
         else:
             final_gal.drawImage(gal_blank)
             gal_minus = np.subtract(gal_blank.array, Diff)
@@ -195,8 +206,8 @@ def generate_realisations_trys(path, case, trys):
     
     
 # path = config.workpath('Test/')
-# # tab.training_set_tab(5, 10, 1, 2, 64, 64,350, 350, path)
-# # # # # bounds = table['bound_x_left']
+# # # tab.training_set_tab(5, 10, 1, 2, 64, 64,350, 350, path)
+# # # # # # bounds = table['bound_x_left']
 # generate_realisations(path + 'Input_data_0.fits', path, 0)
 
 def generate_image(path):
@@ -266,9 +277,13 @@ def generate_image(path):
     return None
 
 if __name__ == "__main__":
-    path = config.workpath('Comparison/')
-    tab.generate_table(5, 5, 64, 64, path)
-    generate_image(path)
+    path = config.workpath('Test/')
+    # # tab.training_set_tab(5, 10, 1, 2, 64, 64,350, 350, path)
+    # # # # # bounds = table['bound_x_left']
+    generate_realisations(path, 1)
+    # path = config.workpath('Comparison/')
+    # tab.generate_table(5, 5, 64, 64, path)
+    # generate_image(path)
     
 # path = config.workpath('Test/')
 # table = Table.read(path + '/Input_data_0.fits')

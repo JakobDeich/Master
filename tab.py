@@ -27,6 +27,7 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_s
     shear = np.linspace(-0.01,0.01 ,n_shear)
     values = []
     count1 = 0
+    ud = galsim.UniformDeviate()
     for i in range(n_shear):
         for j in range(n_rot):
             for k in range(2):
@@ -36,7 +37,6 @@ def tab_realisation(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_s
     count = 0
     n_canc = n_shear*n_rot*2
     for realisation in range(n_rea):
-        ud = galsim.UniformDeviate(random_seed + count + 1)
         dx = (2*ud()-1) * 0.1/2
         dy = (2*ud()-1) * 0.1/2
         e_betrag = trunc_rayleigh(0.25, 0.7, case)
@@ -120,7 +120,7 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
     logging.info('filtered GEMS catalog with cuts')
     rng = np.random.default_rng()
     tab_random = rng.choice(tab, size = N)
-    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top', 'rotation','number'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'i4', 'i4'], meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'N': N})
+    t = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top', 'rotation','number'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'i4', 'i4'], meta = {'ny_tiles': ny_tiles, 'nx_tiles': ny_tiles, 'n_cas':ny_tiles *nx_tiles,'n_rea':1, 'n_canc':1, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'N': N})
     i = 0
     for iy in range(ny_tiles):
         for ix in range(nx_tiles):
@@ -133,13 +133,11 @@ def generate_table(ny_tiles, nx_tiles, stamp_xsize, stamp_ysize, path):
             tru_sersicns = np.linspace(0.3, 6.0, 21)
             n_ser= tru_sersicns[(np.abs(tru_sersicns-n_ser)).argmin()]
             r_half = tab_random[i][2]
-            e_betrag = trunc_rayleigh(0.25, 0.7)  
+            e_betrag = trunc_rayleigh(0.25, 0.7, i)  
             phi = rng.choice(180)
             e1 = e_betrag*np.cos(2*phi)
             e2 = e_betrag*np.sin(2*phi)
             params = [mag, n_ser, r_half, e1, e2, bound1, bound2, bound3, bound4, 0, i+1]
-            t.add_row(params)
-            params = [mag, n_ser, r_half, e1, e2, stamp_xsize* nx_tiles + bound1,stamp_xsize* nx_tiles + bound2, bound3, bound4, 1, i+1]
             t.add_row(params)
             i = i + 1
     logging.info('%d galaxies and their parameters were drawn randomly from GEMS catalog' %N)

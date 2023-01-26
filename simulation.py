@@ -17,7 +17,7 @@ from astropy.table import Table, vstack
 def generate_sim_trainingSet(path, case):
     mydir =config.workpath(path)
     os.makedirs(mydir, exist_ok=True)
-    # tab.training_set_tab(3, 20, case, 1000, 64, 64, 350, 350, mydir)
+    tab.training_set_tab(3, 20, case, 200, 64, 64, 350, 350, mydir)
     cases = np.arange(case)
     #gal_image = []
     final = []

@@ -30,28 +30,28 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 # simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
 
 if __name__ == "__main__":
-    # simulation.generate_sim_trainingSet('Test5', 100)
-    # simulation.ksb_training('Test5', 100)
+    simulation.generate_sim_trainingSet('Test', 100)
+    simulation.ksb_training('Test', 100)
     final = []
     # final1 = []
-    path = config.workpath('Test5')
+    # path = config.workpath('Test')
     cases = [0,20,30,40,50, 60, 70]
-    trys =np.arange(20)
+    trys =np.arange(15)
     # for j in cases:
     #     for i in trys:
     #         try:
     #             image_file = path + '/Grid_case' + str(j) +'_' + str(i) + '.fits'
     #             gal_image = galsim.fits.read(image_file)
     #         except:
-    #             params = [config.workpath('Test4'), j, i] 
+    #             params = [config.workpath('Test5'), j, i] 
     #             final1.append(params)
     for j in cases:
         for i in trys:
-            params = [config.workpath('Test5'), j, i]
+            params = [config.workpath('Test'), j, i]
             final.append(params)
-    with Pool(processes =175) as pool:
+    with Pool() as pool:
         pool.starmap(image.generate_realisations_trys, final)
-    with Pool(processes =175) as pool:
+    with Pool() as pool:
         pool.starmap(ksb.calculate_ksb_training_trys, final)
 
 
