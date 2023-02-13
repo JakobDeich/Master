@@ -16,6 +16,8 @@ matplotlib.use('Tkagg')
 import tensorflow as tf
 from astropy.table import Table
 import logging
+from pathlib import Path
+import pickle
 
 # aper = np.ones(30)*400
 # sigma_mom = np.ones(30)*10
@@ -55,20 +57,14 @@ def threeD_to_oneD(array, ncas, nrea):
             tab[case * nrea + rea] = array[case][rea][0]       
     return tab
 
-def oneD_to_threeD(path, parameter, ncas, nreas, case_percentage):
-    array = np.zeros((round(ncas*case_percentage) , nreas,1))
-    array2 = np.zeros((round(ncas - ncas*case_percentage) , nreas,1))
-    for i in range(round(ncas*case_percentage)):
+def oneD_to_threeD(path, parameter, ncas, nreas):
+    array = np.zeros((ncas , nreas,1))
+    for i in range(ncas):
         path2 = config.workpath(path + '/Measured_ksb_' + str(i) +'.fits')
         table =Table.read(path2)
         for j in range(nreas):
             array[i][j][0] = table[j][parameter]
-    for i,k in enumerate(np.arange(round(ncas*case_percentage), ncas)):
-        path2 = config.workpath(path + '/Measured_ksb_' + str(k) +'.fits')
-        table =Table.read(path2)
-        for j in range(nreas):
-            array2[i][j][0] = table[j][parameter]    
-    return array, array2
+    return array
 
 def split_list(a_list):
     half = len(a_list)//2
@@ -77,14 +73,16 @@ def split_list(a_list):
 def preprocessing(path, include_validation, val):
     print('start filtering')
     mydir = config.workpath(path)
-    table = Table.read(mydir + '/Measured_ksb.fits')
+    table = Table.read(mydir + '/Measured_ksb_1.fits')
     ncas = table.meta['N_CAS']
     fine_cases = []
     for i in range(ncas):
         path2 = config.workpath(path + '/Measured_ksb_' + str(i) +'.fits')
-        table1 =Table.read(path2)
-        if min(table1['e1_cal']) > -9:
-            fine_cases.append(i)
+        file_name = Path(path2)
+        if file_name.exists():
+            table1 =Table.read(path2)
+            if min(table1['e1_cal']) > -9:
+                fine_cases.append(i)
     if include_validation == True:
         fine_cases_train, fine_cases_val = split_list(fine_cases)
         if val ==True:
@@ -104,16 +102,18 @@ def Data_processing(path, include_validation = False, val = False):
     print('start preprocessing')
     dic = {}
     mydir = config.workpath(path)
-    table = Table.read(mydir + '/Measured_ksb.fits')
+    table = Table.read(mydir + '/Measured_ksb_1.fits')
     ncas = table.meta['N_CAS']
     Training = preprocessing(path, include_validation, val)
     ncas = len(Training)
     nreas = table.meta['N_REA']*table.meta['N_CANC']
-    feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf', 'e2_cal', 'e2_cal_psf']
+    feas = ['aperture_sum','sigma_mom', 'rho4_mom', 'sigma_mom_psf', 'e1_cal', 'e1_cal_psf', 'e2_cal', 'e2_cal_psf', 'anisotropy_corr', 'anisotropy_corr_2']
     #feas = ['aperture_sum','sigma_mom']
     ac = np.zeros((ncas, nreas,1))
     e1 = np.zeros((ncas, nreas,1))
-    Pg = np.zeros((ncas, nreas,1))
+    ac2 = np.zeros((ncas, nreas,1))
+    e2 = np.zeros((ncas, nreas,1))
+    # Pg = np.zeros((ncas, nreas,1))
     features = np.zeros((ncas, nreas,len(feas)))
     fea_max = np.zeros(len(feas))
     for count,i in enumerate(feas):
@@ -122,9 +122,11 @@ def Data_processing(path, include_validation = False, val = False):
         path2 = config.workpath(path + '/Measured_ksb_' + str(value) +'.fits')
         table =Table.read(path2)
         for j in range(nreas):
+            ac2[numb][j][0] = table[j]['anisotropy_corr_2']
+            e2[numb][j][0] = table[j]['e2_cal']
             ac[numb][j][0] = table[j]['anisotropy_corr']
             e1[numb][j][0] = table[j]['e1_cal']
-            Pg[numb][j][0] = table[j]['Pg_11']
+            # Pg[numb][j][0] = table[j]['Pg_11']
             for count_fea,k in enumerate(feas):
                 features[numb][j][count_fea] = table[j][k]/fea_max[count_fea]
     flags = []
@@ -137,43 +139,61 @@ def Data_processing(path, include_validation = False, val = False):
     dic['features'] = features
     dic['anisotropy_corr'] = ac
     dic['e1_cal'] = e1
-    dic['Pg_11'] = Pg
+    dic['anisotropy_corr_2'] = ac2
+    dic['e2_cal'] = e2
+    # dic['Pg_11'] = Pg
     dic['n_rea'] = nreas
     dic['n_fea'] = len(feas)
     dic['n_cas'] = ncas
+    pickle.dump( dic, open( mydir + "/Processed_data.p", "wb" ) )
     print('finished preprocessing')
     return dic
 
 # dic = Data_processing('Test2', 1, True)
-def cost_func(preds, polarisation, anisotropy_corr):
+def cost_func(preds,  polarisation, anisotropy_corr, polarisation2,  anisotropy_corr2):
     preds = tf.convert_to_tensor(preds, dtype=float)
+    preds1,preds2 = tf.split(preds, num_or_size_splits=2, axis = 2)
     polarisation = tf.convert_to_tensor(polarisation, dtype=float)
     anisotropy_corr = tf.convert_to_tensor(anisotropy_corr, dtype=float)
+    polarisation2 = tf.convert_to_tensor(polarisation, dtype=float)
+    anisotropy_corr2 = tf.convert_to_tensor(anisotropy_corr, dtype=float)
     if tf.keras.backend.ndim(preds) == 3:  
         # print(Minus_sq)
         # print(tf.keras.backend.mean(Minus_sq, axis = 1, keepdims = True))
-        cs = tf.keras.backend.mean(polarisation - preds * anisotropy_corr, axis = 1, keepdims = True)
+        cs = tf.keras.backend.mean(polarisation - preds1 * anisotropy_corr, axis = 1, keepdims = True)
         cs_square = tf.keras.backend.square(cs)
-        cs_square_mean = tf.keras.backend.mean(cs_square, keepdims = True) 
-        return cs_square_mean
+        cs2 = tf.keras.backend.mean(polarisation2 - preds2 * anisotropy_corr2, axis = 1, keepdims = True)
+        cs_square2 = tf.keras.backend.square(cs2)
+        cs_square_mean = tf.keras.backend.mean(cs_square, keepdims = True)
+        cs_square_mean2 = tf.keras.backend.mean(cs_square2, keepdims = True) 
+        return cs_square_mean + cs_square_mean2
     else:
         print('false number of dimensions')
+
+# preds = np.ones((99, 204000,2))
+# pol = np.ones((99, 204000,1))*0.1
+# pol2 = np.ones((99, 204000,1))*0.2
+# ac = np.ones((99, 204000,1))*0.01
+# ac2 = np.ones((99, 204000,1))*0.005
+# print(cost_func(preds, pol, pol2, ac, ac2))
 
 
 def create_model(nreas, nfea, hidden_layers = (3,3)):
     input_fea=tf.keras.Input((nreas, nfea),dtype='float32', name="Features") #feat
     auxilary_fea1=tf.keras.Input((nreas,1),dtype='float32', name="auxilary_features_1") #polarisation
     auxilary_fea2=tf.keras.Input((nreas,1),dtype='float32', name="auxilary_features_2") #anisotropy correction
+    auxilary_fea3=tf.keras.Input((nreas,1),dtype='float32', name="auxilary_features_3") #polarisation second comp
+    auxilary_fea4=tf.keras.Input((nreas,1),dtype='float32', name="auxilary_features_4") #anisotropy correction second comp
     model = tf.keras.Sequential()
     for hidden_layer in hidden_layers:
         Layer = layer.TfbilacLayer(hidden_layer)
         model.add(Layer)
         model.add(tf.keras.layers.Activation('sigmoid'))
-    model.add(layer.TfbilacLayer(1))
+    model.add(layer.TfbilacLayer(2))
     x = model(input_fea)
     outputs = [x]
-    model=(tf.keras.Model(inputs=[input_fea, auxilary_fea1, auxilary_fea2],outputs=outputs))
-    model.add_loss(cost_func(x, auxilary_fea1, auxilary_fea2))
+    model=(tf.keras.Model(inputs=[input_fea, auxilary_fea1, auxilary_fea2, auxilary_fea3, auxilary_fea4],outputs=outputs))
+    model.add_loss(cost_func(x, auxilary_fea1, auxilary_fea2, auxilary_fea3, auxilary_fea4))
     return model
 
 def boostFDep(Parameter, bsm, nreas, Plot_Name):
@@ -219,7 +239,7 @@ def train(dic, checkpoint_path, epochs):
             save_freq='epoch')
     model.save_weights(checkpoint_path.format(epoch=0))
     history = model.fit(
-            [dic['features'], dic['e1_cal'], dic['anisotropy_corr']], 
+            [dic['features'], dic['e1_cal'], dic['anisotropy_corr'], dic['e2_cal'], dic['anisotropy_corr_2']], 
             None, 
             epochs = epochs,
             verbose = 2, 
@@ -232,11 +252,11 @@ def validate(dic, checkpoint_path):
     model = create_model(dic['n_rea'], dic['n_fea'])
     model.compile(
             loss = None,
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.01),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.06),
             metrics = [])
     model.load_weights(checkpoint_path)
-    loss = model.evaluate([dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
-    val_preds = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr']])
+    loss = model.evaluate([dic['features'], dic['e1_cal'], dic['anisotropy_corr'], dic['e2_cal'], dic['anisotropy_corr_2']])
+    val_preds = model.predict(x = [dic['features'], dic['e1_cal'], dic['anisotropy_corr'], dic['e2_cal'], dic['anisotropy_corr_2']])
     return val_preds
 
 def test(features_test, polarisation_test, anisotropy_corr_test, nreas, nfea, checkpoint_path):
@@ -295,23 +315,57 @@ def cases(dic, path, bsm, val_preds, case_percentage, param, param_name, trainin
         plt.show()
         
 
-def cases_scatter_plot(dic,bsm, path, param, label, non_boost=True):
-    e = (dic['e1_cal'] -  bsm * dic['anisotropy_corr'])
-    e2 = (dic['e1_cal'] -  dic['anisotropy_corr'])
-    params, params2 = oneD_to_threeD(path, param, dic['n_cas'], dic['n_rea'], 1)
+def cases_scatter_plot(dic,bsm, path, param, label,xlabel, first_component = True, non_boost=True):
+    if first_component == True:
+        e = (dic['e1_cal'] -  bsm * dic['anisotropy_corr'])
+        e2 = (dic['e1_cal'] -  dic['anisotropy_corr'])
+    else:
+        e = (dic['e2_cal'] -  bsm * dic['anisotropy_corr_2'])
+        e2 = (dic['e2_cal'] -  dic['anisotropy_corr_2'])        
+    params = oneD_to_threeD(path, param, dic['n_cas'], dic['n_rea'])
+    error = []
+    for j in range(100):
+        means = []
+        mean = np.mean(e[j,:,0])
+        for i in range(int(dic['n_rea']/120)):
+            means.append(np.mean(e[j,i*120:(i+1)*120,0]))
+        stabw = np.sum((means - mean)**2)/int(dic['n_rea']/120)
+        stabw = np.sqrt(stabw)/np.sqrt(int(dic['n_rea']/120))
+        error.append(stabw)   
+    error2 = []
+    for j in range(100):
+        means2 = []
+        mean2 = np.mean(e2[j,:,0])
+        for i in range(int(dic['n_rea']/120)):
+            means2.append(np.mean(e2[j,i*120:(i+1)*120,0]))
+        stabw = np.sum((means2 - mean2)**2)/int(dic['n_rea']/120)
+        stabw = np.sqrt(stabw)/np.sqrt(int(dic['n_rea']/120))
+        error2.append(stabw)       
     dic1 = mean_of(dic['n_cas'], e, e2, params)
     if non_boost == True:
-        plt.scatter(dic1['param_mean'], dic1['e2_mean'], marker = '.', label = '$b^{sm} = 1$')
+        plt.scatter(dic1['param_mean'], dic1['e2_mean'], marker = '.', color = 'r', label = '$b^{sm} = 1$')
+        print(np.mean(np.square(dic1['e2_mean'])))
+        plt.errorbar(dic1['param_mean'], dic1['e2_mean'], yerr = error2, ecolor = 'r', linestyle = ' ')
         plt.xlabel('$e_1^{PSF}$ psf polarisation')
         plt.ylabel('$c_1$ additive bias')
         plt.legend(loc = 'upper center')
-        plt.ylim([-0.0025, 0.0025])
+        # plt.ylim([-0.0025, 0.0025])
         plt.tight_layout()
+        # plt.savefig('Plots2/C-bias2/training_example0.png')
     # plt.scatter(dic1['param_mean'], dic1['e2_mean'], label = '$b^{sm} = 1$')
-    plt.scatter(dic1['param_mean'], dic1['e_mean'], marker = '.', label = label)
-    plt.xlabel('$e_1^{PSF}$ psf polarisation')
-    # plt.xlabel('aperture sum')
-    plt.ylabel('$c_1$ additive bias')
+    plt.scatter(dic1['param_mean'], dic1['e_mean'], marker = '.',color = 'g', label = label)
+    print(np.mean(np.square(dic1['e_mean'])))
+    plt.errorbar(dic1['param_mean'], dic1['e_mean'], yerr = error, ecolor = 'green', linestyle = ' ')
+    param_min = min(dic1['param_mean'])
+    param_max= max(dic1['param_mean'])
+    plt.axhline(y = 0, color = 'black', linestyle = 'dashed')
+    # plt.xlabel('$e_1^{PSF}$ psf polarisation')
+    plt.xlabel(xlabel)
+    # plt.xlabel('Standard deviation of additive bias estimate')
+    if first_component == True:
+        plt.ylabel('$c_1$ additive bias')
+    else:
+        plt.ylabel('$c_2$ additive bias')
     plt.tight_layout()
     plt.legend(loc = 'upper center')
     # plt.savefig('Plots2/C-bias2/training_example.png')
@@ -381,22 +435,40 @@ def cases_scatter_plot(dic,bsm, path, param, label, non_boost=True):
 # print(model.evaluate(x = [features, e1, ac], y = None))
 # print(bsm)
 
-dic6 = Data_processing('Test4')
-# model, history = train(dic6, checkpoint_path, 1500)
-# # dic7 = Data_processing('Test2')
-# # val_preds = validate(dic7, checkpoint_path)
-# bsm = model.predict(x = [dic6['features'], dic6['e1_cal'], dic6['anisotropy_corr']])
-path = config.workpath('Test4')
-# file_name = os.path.join(path, 'BSM_new.fits')
+# dic6 = Data_processing('Test5')
+path = config.workpath('Test5')
+dic6 = pickle.load( open(path + "/Processed_data.p", "rb" ) )
+# # # bsm = np.ones((100,207000,1))
+#model, history = train(dic6, checkpoint_path, 1500)
+#bsm = model.predict(x = [dic6['features'], dic6['e1_cal'], dic6['anisotropy_corr'], dic6['e2_cal'], dic6['anisotropy_corr_2']])
+path = config.workpath('Test5')
+# file_name = os.path.join(path, 'BSM_test2.fits')
 # t = Table([bsm], names = ['bsm'], dtype =['f4'])
 # t.write(file_name, overwrite = True)
-table = Table.read(path + '/BSM.fits')
-dic = mean_of(200, np.ones((200,48000,1)), np.ones((200,48000,1)), table['bsm'])
-dic2 = mean_of(200, np.ones((200,48000,1)), np.ones((200,48000,1)), dic6['features'][:,:,2])
-plt.scatter(dic2['param_mean'], dic['param_mean'], marker = '.')
-plt.ylabel('boost factor')
-plt.xlabel('rho 4 moments')
-# cases_scatter_plot(dic6, table['bsm'], 'Test4', 'e1_cal_psf','training set estimate')
+# bsm, bsm1 = np.split(bsm, indices_or_sections = 2,axis = 2)
+table = Table.read(path + '/BSM_test2.fits')
+bsm = table['bsm']
+bsm, bsm1 = np.split(bsm, indices_or_sections = 2,axis = 2)
+# plt.scatter(bsm, bsm1, marker = '.')
+# plt.xlabel('$b^{sm}_1$')
+# plt.ylabel('$b^{sm}_2$')
+cases_scatter_plot(dic6, bsm, 'Test5', 'rho4_mom', 'ML boost-factor', 'sersic index estimate', True)
+# model, history = train(dic6, checkpoint_path, 500)
+# # # dic7 = Data_processing('Test2')
+# # # val_preds = validate(dic7, checkpoint_path)
+# bsm = model.predict(x = [dic6['features'], dic6['e1_cal'], dic6['anisotropy_corr']])
+# path = config.workpath('Test3')
+# file_name = os.path.join(path, 'BSM.fits')
+# t = Table([bsm], names = ['bsm'], dtype =['f4'])
+# t.write(file_name, overwrite = True)
+# table = Table.read(path + '/BSM.fits')
+# dic = mean_of(99, np.ones((99,96000,1)), np.ones((99,96000,1)), table['bsm'])
+# dic2 = mean_of(99, np.ones((99,96000,1)), np.ones((99,96000,1)), dic6['features'][:,:,1])
+# plt.scatter(dic2['param_mean'], dic['param_mean'], marker = '.')
+# plt.ylabel('boost factor')
+# plt.xlabel('galaxy size')
+# bsm = 1
+# cases_scatter_plot(dic6, bsm, 'Test3', 'e1_cal_psf','training set estimate')
 
 
 

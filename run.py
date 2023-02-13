@@ -9,6 +9,7 @@ import tab
 import galsim
 import image
 from multiprocessing import Pool
+from pathlib import Path
 start = time.time()
 
 
@@ -29,30 +30,60 @@ def psf_pol_run(N = 6, psf_pol_max = 0.1):
 #simulation.simulate_Grids_psf(20, 6, 'Run', '/PSF_es', 0.1)
 # simulation.calculate_shear_psf(20, 6, 'Run', '/PSF_es')
 
-if __name__ == "__main__":
-    simulation.generate_sim_trainingSet('Test', 100)
-    simulation.ksb_training('Test', 100)
+def standarddev_test(nrea, cases, trys):
     final = []
-    # final1 = []
-    # path = config.workpath('Test')
-    cases = [0,20,30,40,50, 60, 70]
-    trys =np.arange(15)
-    # for j in cases:
-    #     for i in trys:
-    #         try:
-    #             image_file = path + '/Grid_case' + str(j) +'_' + str(i) + '.fits'
-    #             gal_image = galsim.fits.read(image_file)
-    #         except:
-    #             params = [config.workpath('Test5'), j, i] 
-    #             final1.append(params)
+    #tab.training_set_tab_trys(3, 20, cases, nrea, 64, 64, 350, 350, config.workpath('Test3'))
     for j in cases:
         for i in trys:
-            params = [config.workpath('Test'), j, i]
+            params = [config.workpath('Test3'), j, nrea, i]
             final.append(params)
     with Pool() as pool:
         pool.starmap(image.generate_realisations_trys, final)
     with Pool() as pool:
         pool.starmap(ksb.calculate_ksb_training_trys, final)
+
+def standarddev_test2(final):
+    #tab.training_set_tab_trys(3, 20, cases, nrea, 64, 64, 350, 350, config.workpath('Test3'))
+    # with Pool() as pool:
+    #     pool.starmap(image.generate_realisations_trys, final)
+    with Pool() as pool:
+        pool.starmap(ksb.calculate_ksb_training_trys, final)
+
+if __name__ == "__main__":
+    simulation.generate_sim_trainingSet('Test5_validation', 100)
+    simulation.ksb_training('Test5_validation', 100)
+    # final1 = []
+    # path = config.workpath('Test')
+    #path = config.workpath('Test3')
+    #cases = [0,20,30,40,50, 60, 70]
+    #trys =np.arange(15)
+    #final = []
+    #for j in cases:
+    #    for i in trys:
+    #        image_file = path + '/Measured_ksb_' + str(j) +'_' + str(i) + '_3400.fits'
+    #        image_file = Path(image_file)
+    #        if image_file.exists():
+    #            True
+    #            #param = [config.workpath('Test3'), j, 3400, i]
+    #            #final.append(param)
+    #        else:
+    #            param = [config.workpath('Test3'), j, 3400, i]
+    #            final.append(param)
+    #print(final)
+    # # cases = [0,20,30,40,50, 60, 70]
+    # # trys =np.arange(15)
+    # # for j in cases:
+    # #     for i in trys:
+    # #         try:
+    # #             image_file = path + '/Grid_case' + str(j) +'_' + str(i) + '.fits'
+    # #             gal_image = galsim.fits.read(image_file)
+    # #         except:
+    # #             params = [config.workpath('Test5'), j, i] 
+    # #             final1.append(params)
+    #standarddev_test2(final)
+    
+    
+    
 
 
 # path = config.workpath('Example')

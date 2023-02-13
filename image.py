@@ -16,10 +16,10 @@ import threading
 # table = tab.generate_table(5,5,40,40)
 
 def generate_psf():
-    psf = galsim.OpticalPSF(lam = 600, diam = 1.2, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
+    psf = galsim.OpticalPSF(lam = 600, diam = 0.6, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
     lams = [700,800,900]
     for lam in lams:
-        optical_psf = galsim.OpticalPSF(lam = lam, diam = 1.2, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
+        optical_psf = galsim.OpticalPSF(lam = lam, diam = 0.6, obscuration = 0.29, nstruts = 6, scale_unit = galsim.arcsec)
         psf = galsim.Add([psf, optical_psf])
     psf = psf/(len(lams) + 1)
     return psf
@@ -86,9 +86,9 @@ def generate_realisations(path, case):
     file_name = os.path.join(path, 'PSF_' + str(case) + '.fits')
     psf_image.write(file_name)
     for Galaxy in table:
-        if count%2000==0:
+        if count%4000==0:
             print(count, case)
-        gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
+        gal_blank = galsim.ImageF(stamp_xsize - 1, stamp_ysize - 1, scale = pixel_scale)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
         gs = galsim.GSParams(maximum_fft_size=22000)  #in pixel              
@@ -107,7 +107,7 @@ def generate_realisations(path, case):
         #add noise
         if Galaxy['pixel_noise'] == 0:
             with galsim.utilities.single_threaded():
-                gal_test = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
+                gal_test = galsim.ImageF(stamp_xsize - 1, stamp_ysize - 1, scale = pixel_scale)
                 final_gal.drawImage(sub_gal_image)
                 final_gal.drawImage(gal_blank)
                 final_gal.drawImage(gal_test)
@@ -123,16 +123,17 @@ def generate_realisations(path, case):
             # print(nul)
             # break
         count = count + 1
-    # if not os.path.isdir(path):
-    #         os.mkdir(path)
-    # file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
-    # gal_image.write(file_name)
+    print('Galaxies drawn')
+    if not os.path.isdir(path):
+            os.mkdir(path)
+    file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
+    gal_image.write(file_name)
     return None
 
 
-def generate_realisations_trys(path, case, trys):
+def generate_realisations_trys(path, case, n_rea, trys):
     random_seed = 15783
-    table = Table.read(path + '/Input_data_' + str(case) + '.fits')
+    table = Table.read(path + '/Input_data_' + str(case) + '_' + str(n_rea) +'.fits')
     stamp_xsize = table.meta['STAMP_X']
     stamp_ysize = table.meta['STAMP_Y']
     psf_stamp_x = table.meta['PSF_X']
@@ -164,7 +165,7 @@ def generate_realisations_trys(path, case, trys):
     # psf_image.write(file_name)
     for Galaxy in table:
         gal_blank = galsim.ImageF(stamp_xsize -1, stamp_ysize -1, scale = pixel_scale)
-        if count%2000==0:
+        if count%4000==0:
             print(count, case)
         flux = gal_flux(Galaxy['mag'])
         #define galaxy with sersic profile
@@ -200,7 +201,7 @@ def generate_realisations_trys(path, case, trys):
     if not os.path.isdir(path):
             os.mkdir(path)
     # file_name = os.path.join(path, 'Grid_case' + str(case) + '.fits')
-    file_name = os.path.join(path, 'Grid_case' + str(case) + '_' + str(trys) + '.fits')
+    file_name = os.path.join(path, 'Grid_case' + str(case) + '_' + str(trys) + '_' + str(n_rea) +'.fits')
     gal_image.write(file_name)
     return None
     

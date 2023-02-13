@@ -79,6 +79,52 @@ def training_set_tab(n_shear, n_rot, n_cas, n_rea, stamp_xsize, stamp_ysize, psf
             pool.starmap(tab_realisation, final)
     return None
 
+def tab_realisation_trys(n_shear, n_rot, n_rea, n_cas,stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, mag, n_sersic, r_half, case, path):
+    print('case ' + str(case) + ' building trys table')
+    table = Table(names = ['mag', 'n', 'r_half', 'e1', 'e2', 'gamma1', 'bound_x_left', 'bound_x_right', 'bound_y_bottom', 'bound_y_top','pixel_shift_x','pixel_shift_y', 'rotation', 'pixel_noise'], dtype = ['f4', 'f4', 'f4', 'f4', 'f4', 'f4', 'i4', 'i4', 'i4', 'i4', 'f4', 'f4', 'f4', 'i4'], meta = {'n_rot': n_rot,'n_shear': n_shear,'n_rea': n_rea,'n_canc': (n_shear*n_rot*2),'n_cas': n_cas, 'stamp_x': stamp_xsize, 'stamp_y': stamp_ysize, 'psf_x': psf_stamp_x, 'psf_y': psf_stamp_y})
+    random_seed = 15783 + case
+    rng = np.random.default_rng()
+    rotation = np.linspace(0, 180, n_rot, endpoint= False)
+    shear = np.linspace(-0.01,0.01 ,n_shear)
+    values = []
+    count1 = 0
+    ud = galsim.UniformDeviate()
+    for i in range(n_shear):
+        for j in range(n_rot):
+            for k in range(2):
+                params = [shear[i],rotation[j],k*n_rot*stamp_ysize+j*stamp_xsize + 1, k*n_rot*stamp_ysize+(j+1)*stamp_xsize-1,  i*stamp_ysize + 1, (i+1)*stamp_ysize - 1, k] 
+                values.append(params)
+            count1 = count1 + 1
+    count = 0
+    n_canc = n_shear*n_rot*2
+    for realisation in range(n_rea):
+        dx = (2*ud()-1) * 0.1/2
+        dy = (2*ud()-1) * 0.1/2
+        e_betrag = trunc_rayleigh(0.25, 0.7, case)
+        phi = rng.choice(180)
+        for Cancellation in values:
+            e1 = e_betrag*np.cos(2*phi) 
+            e2 = e_betrag*np.sin(2*phi)
+            params = [mag, n_sersic, r_half, e1, e2, Cancellation[0], Cancellation[2], Cancellation[3], realisation*stamp_ysize*n_shear + Cancellation[4], realisation*stamp_ysize*n_shear + Cancellation[5], dx, dy,Cancellation[1], Cancellation[6]]
+            table.add_row(params)
+        count = count + 1
+    if not os.path.isdir(path):
+        os.mkdir(path)
+    file_name = os.path.join(path, 'Input_data_' + str(case) + '_' + str(n_rea) +'.fits')
+    table.write( file_name , overwrite=True) 
+    print('case ' + str(case) + ' finished trys table')
+    return None
+
+def training_set_tab_trys(n_shear, n_rot, cases, n_rea, stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, path):
+    final = []
+    for i,j in enumerate(cases):
+        table = Table.read(path + '/Input_data_' + str(j) + '.fits')
+        params = [n_shear, n_rot, n_rea, len(cases),stamp_xsize, stamp_ysize, psf_stamp_x, psf_stamp_y, table['mag'][0], table['n'][0], table['r_half'][0], j, path]
+        final.append(params)
+    with Pool(processes = 100) as pool:
+            pool.starmap(tab_realisation_trys, final)
+    return None    
+
 if __name__ == "__main__":
 	path = config.workpath('Test')
 	training_set_tab(3, 10, 4, 400, 64, 64, 350, 350, path)

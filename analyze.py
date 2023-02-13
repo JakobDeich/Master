@@ -11,6 +11,7 @@ import os
 from astropy.table import Table, Column, vstack
 import time
 import ksb
+from pathlib import Path
 
 start = time.time()
 
@@ -20,38 +21,71 @@ def linear(x, m, b):
 def gal_mag(flux):
     return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
 
-# path = config.workpath('Test4')
+# path = config.workpath('Test3')
 # cases = [0,20,30,40,50, 60, 70]
-# trys =np.arange(25)
+# trys =np.arange(15)
+# final = []
 # for j in cases:
 #     for i in trys:
-#         try:
-#             image_file = path + '/Grid_case' + str(j) +'_' + str(i) + '.fits'
-#             gal_image = galsim.fits.read(image_file)
-#         except:
-#             print(j, i)
+#         image_file = path + '/Grid_case' + str(j) +'_' + str(i) + '_3400.fits'
+#         image_file = Path(image_file)
+#         if image_file.exists():
+#             True
+#         else:
+#             param = [j,i]
+#             final.append(param)
+# print(final)
+            
 
-path = config.workpath('Test4')
+# path = config.workpath('Test3')
 # cases = [0,20,30,40,50, 60, 70]
-cases = [5,10,15]
-# trys = np.arange(25)
-trys = np.arange(10)
-for j in cases:
-    pol = []
-    param = []
-    for i in trys:
-        table = Table.read(path + '/Measured_ksb_' + str(j) +'_' + str(i) + '.fits')
-        # table = Table.read(path + '/Measured_ksb_' + str(j) + '.fits')
-        pol.append(np.mean(table['e1_cal']-table['anisotropy_corr']))
-        param.append(np.mean(table['sigma_mom']))
-    pol_mean = np.mean(pol)
-    stabw = np.sum((pol-pol_mean)**2)/len(pol)
-    stabw = np.sqrt(stabw)
-    plt.scatter(param,pol, marker = '.', label = 'case ' + str(j))
-    plt.errorbar(np.mean(param), pol_mean, yerr = stabw, fmt = 'x',label = 'mean case ' + str(j) + ' with standard deviation')
-plt.legend()
-plt.xlabel('sigma moments')
-plt.ylabel('additive bias')
+# # cases = [5,10,15]
+# # trys = np.arange(25)
+# trys = np.arange(15)
+# st = []
+# nreas = ['_200','_400', '','_1700', '_3400']
+# reas = [200*120,400*120,800*120, 1700*120, 3400*120]
+# for j in cases:
+#     sts = []
+#     for rea in nreas:
+#         pol = []
+#         param = []
+#         for i in trys:
+#             file_name = path + '/Measured_ksb_' + str(j) +'_' + str(i) + rea + '.fits'
+#             file_name = Path(file_name)
+#             if file_name.exists():
+#                 table = Table.read(file_name)
+#                 if min(table['e1_cal'] > -9):
+#                     pol.append(np.mean(table['e1_cal']-table['anisotropy_corr']))
+#                     param.append(np.mean(table['aperture_sum']))
+#                 else:
+#                     print('oops')
+#             else:
+#                 print(j, i, rea)
+#         pol_mean = np.mean(pol)
+#         stabw = np.sum((pol-pol_mean)**2)/len(pol)
+#         stabw = np.sqrt(stabw)
+#         sts.append(stabw*10**4)
+#         # plt.scatter(param,pol, marker = '.', label = 'case ' + str(j))
+#         # plt.errorbar(np.mean(param), pol_mean, yerr = stabw, fmt = 'x', )
+#     st.append(sts)
+# for i in range(len(cases)):
+#     plt.plot(reas, st[i], marker = 'o',label = 'case: ' + str(cases[i]))
+# plt.legend()
+# plt.xlabel('number of galaxy stamps')
+# plt.ylabel('standard deviation of additive bias [$10^{-4}$]')
+
+# mydir = config.workpath('Test3')
+# es = []
+# for i in range(100):
+#     table1 = Table.read(mydir + '/Measured_ksb_'+ str(i) + '.fits')
+#     e_pol = np.mean(table1['e1_cal_psf'])
+#     if e_pol > 0.05 and e_pol < 2:
+#         es.append(e_pol)
+# print(np.mean(es), len(es))
+    
+
+
 
 # table = Table.read(mydir + '/Input_data_120.fits')
 # print(np.mean(table['mag']))

@@ -31,3 +31,16 @@ def workpath(relpath):
 
 # plt.plot([0,1,2,3], [2,2,2,2])
 # plt.show()
+
+# def s(r,n):
+#     return -(1.999*n-0.327)*(r**(1/n)-1)
+
+# x = np.linspace(0,5, 600)
+# ns = [0.5,0.75,1,2,3,4]
+# for i in ns:
+#     plt.plot(x, s(x,i), label = 'n = ' + str(i))
+# plt.xlabel('radius in units of $R_e$')
+# plt.ylabel('log surface brightness in units of $I_e$')
+# plt.legend()
+# plt.rcParams['font.size'] = 22
+
