@@ -4,7 +4,6 @@ import numpy as np
 import time
 import os
 import ksb
-import analyze
 import tab
 import galsim
 import image
@@ -12,7 +11,7 @@ from multiprocessing import Pool
 from pathlib import Path
 start = time.time()
 
-
+print('lets go')
 def psf_pol(psf_es, number):
     name = 'Run' + str(number) + '/PSF_es'
     simulation.simulate_Grids(20, name , psf_es)
@@ -50,11 +49,21 @@ def standarddev_test2(final):
         pool.starmap(ksb.calculate_ksb_training_trys, final)
 
 if __name__ == "__main__":
-    simulation.generate_sim_trainingSet('Test5_validation', 100)
-    simulation.ksb_training('Test5_validation', 100)
+    simulation.generate_sim_trainingSet('Test2', 100)
+    simulation.ksb_training('Test2', 100)
+    # simulation.ksb_training('Test5_validation', 100)
+    # simulation.ksb_training('Test', 100)
     # final1 = []
     # path = config.workpath('Test')
-    #path = config.workpath('Test3')
+    # path = config.workpath('Test2')
+    # final = []
+    # for i in range(100):
+    #     image_file = path + '/Grid_case' + str(i) + '.fits'
+    #     image_file = Path(image_file)
+    #     if image_file.exists():
+    #             final.append([config.workpath('Test2'), i])
+    # with Pool() as pool:
+    #     pool.starmap(ksb.calculate_ksb_training, final)
     #cases = [0,20,30,40,50, 60, 70]
     #trys =np.arange(15)
     #final = []

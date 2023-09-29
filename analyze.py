@@ -1,18 +1,22 @@
 import config
 from astropy.table import Table
-import galsim
+import matplotlib
+import tkinter 
+matplotlib.use('Tkagg')
+# import galsim
 import matplotlib.pyplot as plt
-import statistics
+# import statistics
 import numpy as np
-from matplotlib import cm
+# from matplotlib import cm
 from scipy.optimize import curve_fit
-from astropy.table import Table
 import os
 from astropy.table import Table, Column, vstack
 import time
-import ksb
+# import ksb
 from pathlib import Path
+import pickle
 
+# from ML import cases_scatter_plot
 start = time.time()
 
 def linear(x, m, b):
@@ -20,6 +24,378 @@ def linear(x, m, b):
 
 def gal_mag(flux):
     return  24.6 - 2.5 * np.log10(3.1/(3*565)* flux)
+
+plt.rcParams.update({'font.size': 14})
+
+# def mean(param,path, corr = False):
+#     print('start')
+#     means = []
+#     means2 = []
+#     t = Table.read(config.workpath(path) + '/Measured_ksb_1.fits')
+#     ncas = t.meta['N_CAS']
+#     for i in range(100):
+#         tab = Table.read(config.workpath(path) + '/Measured_ksb_'+ str(i) + '.fits')
+#         if corr == True:
+#             means.append(np.mean(tab['e1_cal']))
+#             means2.append(np.mean(tab['e1_cal']-tab['anisotropy_corr']))
+#         else:
+#             means.append(np.mean(tab[param]))
+#     print('done')
+#     return means, means2
+
+# def mean2(param,path, corr = False):
+#     print('start')
+#     means = []
+#     means2 = []
+#     t = Table.read(config.workpath(path) + '/Measured_ksb_1.fits')
+#     ncas = t.meta['N_CAS']
+#     for i in range(100):
+#         tab = Table.read(config.workpath(path) + '/Measured_ksb_'+ str(i) + '.fits')
+#         if corr == True:
+#             means.append(np.mean(tab['e2_cal']))
+#             means2.append(np.mean(tab['anisotropy_corr_2']))
+#         else:
+#             means.append(np.mean(tab[param]))
+#     print('done')
+#     return means, means2
+
+def mean(param, path = 'Test5'):
+    res = []
+    for i in range(100):
+        tab = Table.read(config.workpath(path) + '/Measured_ksb_'+ str(i) + '.fits')
+        if (min(tab['e1_cal']) > -9):
+            res.append(np.mean(tab[param]))
+    return np.array(res)
+
+def stdaw(param, path = 'Test5'):
+    mean = []
+    res = []
+    for i in range(100):
+        means = []
+        tab = Table.read(config.workpath(path) + '/Measured_ksb_'+ str(i) + '.fits')
+        mean = np.mean(tab[param])
+        for j in range(1700):
+            means.append(tab[param][j*120:(j+1)*120])
+        stabw = np.sum((means - mean)**2)/1700
+        res.append(stabw)
+    return res
+    
+    
+
+
+def mean_3d(array):
+    means=[]
+    for i in range(len(array)):
+        means.append(np.mean(array[i]))
+    return means
+
+# tab = Table.read(config.workpath('Test4') + '/Measured_ksb.fits')
+# print(max(tab['mag']))
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# path = 'Test5'
+# BSM_train = Table.read(config.workpath('Test5' + '/BSM_1203_val.fits'))
+# print('be')
+# bsm1 = mean_3d(BSM_train['bsm_val1'])
+# print('ba')
+# param = mean('aperture_sum', path)
+# param2 = mean('sigma_mom', path)*0.02
+# param3 = mean('mag')
+# t_exp = 3*565 #s
+# gain = 3.1 #e/ADU
+# Z_p = 24.6
+# param = -1/0.4 * np.log10(gain/t_exp*param)+ Z_p
+# print('bu')
+# sersic = mean('rho4_mom', path)
+# print('bab')
+# plt.scatter(param, param3, c = param2, cmap = 'viridis', marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.xlabel('magnitude estmiate')
+# plt.ylabel('true magnitude')
+# plt.colorbar(label = 'half light radius in arcsec')
+# plt.scatter(param, bsm1, marker = '.', c = sersic, cmap = 'viridis')
+# plt.xlabel('magnitude')
+# plt.ylabel('average $b^{sm}_1$')
+# plt.colorbar(label = r'$\rho_4$ moments')
+def bsm_dep(param_name, train = True, first_comp = True):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    if train == False:
+        name1 = 'val'
+        path = 'Test5_validation'
+        BSM_train = Table.read(config.workpath('Test5' + '/BSM_1203_val.fits'))
+        if first_comp == True:
+            bsm = mean_3d(BSM_train['bsm_val1'])
+            ylabel = 'average $b^{sm}_1$'
+            name2 = 1
+        else:
+            bsm = mean_3d(BSM_train['bsm_val2'])
+            ylabel = 'average $b^{sm}_2$'
+            name2 = 2
+    else:
+        name1 ='train'
+        path = 'Test5'
+        BSM_train = Table.read(config.workpath('Test5' + '/BSM_1203_train.fits'))
+        if first_comp == True:
+            bsm = mean_3d(BSM_train['bsm1'])
+            ylabel = 'average $b^{sm}_1$'
+            name2 = 1
+        else:
+            bsm = mean_3d(BSM_train['bsm2'])
+            ylabel = 'average $b^{sm}_2$'
+            name2 = 2
+    param = mean(param_name, path)
+    if param_name == 'sigma_mom':
+        param = param*0.02
+        xlabel = 'Galaxy size in arcsec'
+        name = 'sigma'
+    elif param_name == 'aperture_sum':
+        t_exp = 3*565 #s
+        gain = 3.1 #e/ADU
+        Z_p = 24.6
+        param = -1/0.4 * np.log10(gain/t_exp*param)+ Z_p
+        xlabel = 'magnitude estimate'
+        name = 'apersum'
+    sersic = mean('rho4_mom', path)
+    plt.scatter(param, bsm, marker = '.', c = sersic, cmap = 'viridis')
+    ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.colorbar(label = r'$\rho_4$ moments')
+    plt.savefig('Thesis_plots/bsm_' + name + '_' + name1 + str(name2) + '.pdf')
+    plt.clf()
+    print('done')
+    return None
+
+#bsm_dep('sigma_mom', train = True, first_comp=(True))
+#bsm_dep('sigma_mom', train = True, first_comp=(False))
+#bsm_dep('sigma_mom', train = False, first_comp=(True))
+#bsm_dep('sigma_mom', train = False, first_comp=(False))
+#bsm_dep('aperture_sum', train = True, first_comp=(True))
+#bsm_dep('aperture_sum', train = True, first_comp=(False))
+#bsm_dep('aperture_sum', train = False, first_comp=(True))
+#bsm_dep('aperture_sum', train = False, first_comp=(False))
+
+# sn = []
+# sn2 = []
+# for i in range(100):
+#     tab = Table.read(config.workpath('Test5')+ '/Measured_ksb_' + str(i) + '.fits')
+#     if np.mean(tab['Signal_to_Noise']) < 10:
+#         sn.append(np.mean(tab['Signal_to_Noise']))
+#     else:
+#         sn2.append(np.mean(tab['Signal_to_Noise']))
+# for i in range(100):
+#     tab = Table.read(config.workpath('Test5')+ '/Measured_ksb_' + str(i) + '.fits')
+#     sn.append(np.mean(tab['Signal_to_Noise']))
+#     sn2.append(np.mean(tab['mag']))
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(sn, sn2)
+# c = []
+# for i in range(30):
+#     if (min(sn) + (max(sn)-min(sn))/30*i) < 10:
+#         s = ['r']
+#         c.extend(s)
+#     else:
+#         s = ['b']
+#         c.extend(s)
+# sn = [sn, sn2]
+# plt.hist(sn, bins = 18, density = False, stacked = True, color = ['r', 'b'], label = ['S/N < 10', 'S/N > 10'])
+# # plt.hist(sn2,density = True, color = 'b')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.xlabel('Signal to Noise ratio')
+# plt.ylabel('counts')
+# plt.legend()
+# plt.show()
+
+# for i in range(100):
+#     tab = Table.read(config.workpath('Test5')+ '/Measured_ksb_' + str(i) + '.fits')
+#     # if np.mean(tab['sigma_mom'])*0.02 < np.mean(tab['sigma_mom_psf'])*0.02*1.25:
+#     print(np.mean(tab['sigma_mom'])/np.mean(tab['sigma_mom_psf']))
+
+# dic = pickle.load( open(config.workpath('Test5/') + "Processed_data_withM_withSN.p" , "rb" ) )
+# print(dic['n_cas'])
+# dic = pickle.load( open(config.workpath('Test5/') + "Processed_data_mergedNNcheck_SN0_val.p" , "rb" ) )
+# print(dic['n_cas'], dic['c-bias_1'], dic['c-bias_2'])
+tab5 = Table.read(config.workpath('Test5') + '/SN10_0604.fits')
+tab1 = Table.read(config.workpath('Test5') + '/SN0_noM_0604.fits')
+tab3 = Table.read(config.workpath('Test5') + '/SN0_0604.fits')
+tab2 = Table.read(config.workpath('Test5') + '/No_Split_0404.fits')
+tab6 = Table.read(config.workpath('Test5') + '/No_Split_SN10_0704.fits')
+tab4 = Table.read(config.workpath('Test5') + '/No_Split_SN0_0904.fits')
+def meanstw(tab):
+    #print('mean after training: ' + str(np.mean(tab['train'])) + ' and validation: ' + str(np.mean(tab['val'])) + ' with cases ' + str(len(tab)))
+    print(min(tab['train']), min(tab['val']))
+    #print((tab['train']), (tab['val']))
+    stabw = np.sqrt(np.sum((tab['train']-np.mean(tab['train']))**2)/(len(tab)-1))/np.sqrt(len(tab))
+    stabw_val = np.sqrt(np.sum((tab['val']-np.mean(tab['val']))**2)/(len(tab)-1))/np.sqrt(len(tab))
+   # print('uncertainty of training: ' + str(stabw) + ' and validation: ' + str(stabw_val) + '\n')
+    return None
+
+meanstw(tab1)
+meanstw(tab2)
+meanstw(tab3)
+meanstw(tab4)
+meanstw(tab5)
+meanstw(tab6)
+    
+# print(tab['train'], tab['val'])
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(mean('e2_cal_psf'), mean('M4_2_psf_adap'))
+# popt, pcov = curve_fit(linear,mean('e2_cal_psf'),mean('M4_2_psf_adap'))
+# plt.plot(mean('e2_cal_psf'),linear(mean('e2_cal_psf'), popt[0], popt[1]), color='r')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.xlabel('$e_2^{PSF}$')
+# plt.ylabel('$Q^{(4)}_2$')
+# plt.tight_layout()
+# print(stdaw('M4_1_psf_adap'))
+# param1 = []
+# param2 = []
+# for i in range(100):
+#     tab = Table.read(config.workpath('Test5') + '/Measured_ksb_' + str(i) + '.fits')
+#     param1.append(np.mean(tab['n']))
+#     # t_exp = 3*565 #s
+#     # gain = 3.1 #e/ADU
+#     # Z_p = 24.6
+#     # l_pix = 0.1 #arcsec
+#     # param2.append(np.mean(1/(-0.4)*np.log10(gain/t_exp*tab['aperture_sum'])+Z_p))
+#     param2.append(np.mean(tab['rho4_mom']))
+
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(param2, param1, marker='.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.grid(True)
+# plt.ylabel('Sérsic index')
+# plt.xlabel(r'$\rho_4$ moments')
+# tab = Table.read(config.workpath('M4_Check') + '/Measured_ksb.fits')
+# plt.scatter(mean('e2_cal_psf'), mean('M4_2_psf_adap'))
+# plt.xlabel('psf polarisation $e_2$')
+# plt.ylabel('$M^{(4)}_2$')
+# plt.tight_layout()
+# # plt.axis('equal')
+
+# path = config.workpath('Test5')
+# path2 = config.workpath('Test5_validation')
+# # print('start')
+# # dic_train = pickle.load( open(path + "/Processed_data_new.p", "rb" ) )
+# # print('go')
+# # print(table)
+# #cases_scatter_plot(dic_train, table['bsm2'], 'Test5', 'M4_1_psf_adap', 'ML-boosted $b^{sm}$', 'fourth moments $M^{(4)}_1$', False)
+# path = config.workpath('Test5')
+# table = Table.read(path + '/Ms_0603.fits')
+# print(min(np.sum(table['Ms'], axis =1)))
+# table = Table.read(path + '/BSM_1203_train.fits')
+# print(table)
+# table2 = Table.read(path + '/BSM_0303_val.fits')
+# dic_train = pickle.load( open(path + "/Processed_data_noM.p", "rb" ) )
+# dic_val = pickle.load( open(path2 + "/Processed_data_noM.p", "rb" ) )
+# # print(dic_train['features'][:,:,1])
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(mean_3d(dic_train['features'][:,:,3]*40),mean_3d(table['bsm1']), marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.xlabel('PSF size')
+# plt.ylabel('$b^{sm}_1$')
+# plt.savefig('Thesis_plots/bsm_rho4_train1.pdf')
+# plt.clf()
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(mean_3d(dic_train['features'][:,:,2]*2.6),mean_3d(table['bsm2']), marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ra# table = Table.read(path + '/BSM_1203_train.fits')
+# table2 = Table.read(path + '/BSM_1203_val.fits')tio(), adjustable='box')
+# plt.xlabel(r'$\rho_4$ moments')
+# plt.ylabel('$b^{sm}_2$')
+# plt.savefig('Thesis_plots/bsm_rho4_train2.pdf')
+# plt.clf()
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(mean_3d(dic_val['features'][:,:,2]*2.6),mean_3d(table2['bsm_val1']), marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.xlabel(r'$\rho_4$ moments')
+# plt.ylabel('$b^{sm}_1$')
+# plt.savefig('Thesis_plots/bsm_rho4_val1.pdf')
+# plt.clf()
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(mean_3d(dic_val['features'][:,:,2]*2.6),mean_3d(table2['bsm_val2']), marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.xlabel(r'$\rho_4$ moments')
+# plt.ylabel('$b^{sm}_2$')
+# plt.savefig('Thesis_plots/bsm_rho4_val2.pdf')
+# plt.clf()
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# bsm1, bsm2 = np.split(table['bsm'],2)
+# plt.scatter(mean_3d(bsm1),mean_3d(bsm2), marker = '.')
+# plt.xlabel('$b^{sm}_1$')
+# plt.ylabel('$b^{sm}_2$')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.tight_layout()
+# plt.savefig('Thesis_plots/BSMs_tog.pdf')
+# plt.clf()
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(mean_3d(table2['bsm_val1']),mean_3d(table2['bsm_val2']), marker = '.')
+# plt.xlabel('$b^{sm}_1$')
+# plt.ylabel('$b^{sm}_2$')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.tight_layout()
+# plt.savefig('Thesis_plots/BSMs_tog_val.pdf')
+
+# print(mean('anisotropy_corr'), mean_3d(table['bsm1']))
+# means= mean('sigma_mom',path)
+# gain = 3.1 #e/ADU
+# Z_p = 24.6
+# l_pix = 0.1 #arcsec
+# t_exp = 3*565 #s
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# means = means*0.02
+# plt.scatter(means, mean_3d(table['bsm1']), marker = '.')
+# # plt.scatter(means2, mean_3d(table['bsm1']), label = '$e_1 - \delta e_1$', marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.ylabel('average $b^{sm}_1$')
+# # plt.xlabel('anisotropy correction $\delta e$')
+# plt.xlabel('Galaxy size in arcsec')
+# plt.tight_layout()
+# # plt.legend()
+# plt.savefig('Thesis_plots/bsm_sigma_train1.pdf')
+# plt.clf()
+# means1, means2 = mean2('blue', path, corr = True)
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# # plt.scatter(means1, mean_3d(table['bsm2']), label ='$e_2$', marker = '.')
+# plt.scatter(means2, mean_3d(table['bsm2']), label = '$e_2 - \delta e_2$', marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.ylabel('average $b^{sm}_2$')
+# plt.xlabel('anisotropy correction $\delta e$')
+# # plt.xlabel('polarisation')
+# #plt.legend()
+# plt.savefig('Thesis_plots/bsm_ac_2.pdf')
+# plt.clf()
+# means1, means2 = mean2('blue', path2, corr = True)
+# plt.scatter(means1, mean_3d(table2['bsm_val2']), label ='$e_2$', marker = '.')
+# plt.scatter(means2, mean_3d(table2['bsm_val2']), label = '$e_2 - \delta e_2$', marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.ylabel('average $b^{sm}_2$')
+# plt.xlabel('anisotropy correction $\delta e$')
+# plt.legend()
+# plt.savefig('Thesis_plots/bsm_ac_val2.pdf')
+# plt.clf()
+# means1, means2 = mean('blue',path2, corr = True)
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# plt.scatter(means1, mean_3d(table2['bsm_val1']), label ='$e_1$', marker = '.')
+# plt.scatter(means2, mean_3d(table2['bsm_val1']), label = '$e_1 - \delta e_1$', marker = '.')
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.ylabel('average $b^{sm}_1$')
+# plt.xlabel('anisotropy correction $\delta e$')
+# plt.legend()
+# plt.savefig('Thesis_plots/bsm_pol_val1.pdf')
+# plt.clf()
+# plt.tight_layout()
 
 # path = config.workpath('Test3')
 # cases = [0,20,30,40,50, 60, 70]
@@ -33,7 +409,7 @@ def gal_mag(flux):
 #             True
 #         else:
 #             param = [j,i]
-#             final.append(param)
+#             final.append(param)n Dozent werde ich die Tage noch 
 # print(final)
             
 
@@ -74,7 +450,8 @@ def gal_mag(flux):
 # plt.legend()
 # plt.xlabel('number of galaxy stamps')
 # plt.ylabel('standard deviation of additive bias [$10^{-4}$]')
-
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
+# plt.tight_layout
 # mydir = config.workpath('Test3')
 # es = []
 # for i in range(100):
@@ -105,8 +482,10 @@ def gal_mag(flux):
 # b = 1
 # gamma_cal = []
 # gamma_real = np.linspace(-0.1,0.1,20)
-# bsm = np.linspace(1,1.4,4)
+# bsm = [1,1.3]
 # cs = []
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
 # for b in bsm:
 #     gamma_cal = []
 #     for i in range(20):
@@ -119,18 +498,21 @@ def gal_mag(flux):
 #         mean2 = np.mean(P_g11)
 #         gamma_cal.append(mean1/mean2 - gamma_real[i])
 #     popt, pcov = curve_fit(linear, gamma_real, gamma_cal)
-#     # plt.scatter(gamma_real, gamma_cal, label = '$b^{sm}_1$ = ' + str(b) + ' , $\mu_1$ = ' + str(round(popt[0], 4)) + ' , $c_1$ = ' + str(round(popt[1], 4)))
-#     # plt.plot(gamma_real, linear(gamma_real, popt[0], popt[1]))
+#     plt.scatter(gamma_real, gamma_cal, label = '$b^{sm}_1$ = ' + str(b) + ' , $c_1$ = ' + str(round(popt[1], 4)))
+#     plt.plot(gamma_real, linear(gamma_real, popt[0], popt[1]))
 #     cs.append(popt[1]) 
 # popt, pcov = curve_fit(linear, bsm, cs)
-# plt.scatter(bsm, cs)
-# plt.plot(bsm, linear(bsm, popt[0], popt[1]))
+# # plt.scatter(bsm, cs)
+# # plt.plot(bsm, linear(bsm, popt[0], popt[1]))
 # m2 = popt[0]
 # b2 = popt[1]
-# plt.scatter(-1*b2/m2, 0, s = 80, color = 'r', marker = 'D',label = 'target boost factor')    
-# plt.xlabel('boost factor $b^{sm}_1$')
-# plt.ylabel('additive bias $c_1$')
+# # plt.scatter(-1*b2/m2, 0, s = 80, color = 'r', marker = 'D',label = 'target boost factor')    
+# # plt.xlabel('boost factor $b^{sm}_1$')
+# # plt.ylabel('additive bias $c_1$')
+# plt.xlabel('$g_1^{true}$')
+# plt.ylabel('$g_1^{measured} - g_1^{true}$')
 # plt.legend()
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
 # plt.savefig('Plots2/Boost_determine_Schema.pdf')
 # print(popt[1])
 
@@ -819,7 +1201,8 @@ def boostFactorDep_save(Var, Var_name, N):
 #     popt, pcov = curve_fit(linear, gamma_real, gamma_cal, sigma = Errors, absolute_sigma = True)
 #     cs_corr.append(popt[1])
 #     print('corrected bias finished')
-# for j in range(6):
+# for j in range(6):path = config.workpath('Test5')
+
 #     gamma_cal = []
 #     Errors = []
 #     for i in range(20):

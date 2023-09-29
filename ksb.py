@@ -1,5 +1,7 @@
 import numpy as np
+from scipy.linalg import fractional_matrix_power
 from astropy.io import fits
+import scipy
 import sys
 import os
 import math
@@ -12,7 +14,7 @@ plt.style.use(astropy_mpl_style)
 import tab
 import config
 import image
-from astropy.table import Table, Column
+from astropy.table import Table, Column, hstack
 from photutils.aperture import CircularAperture
 from photutils.aperture import aperture_photometry
 from photutils.morphology import data_properties
@@ -31,8 +33,31 @@ def gauss2d(x=0, y=0, mx=0, my=0, sx=1, sy=1):
         return 1. / (2. * np.pi * sx * sy) * np.exp(-((x - mx)**2. / (2. * sx**2.) + (y - my)**2. / (2. * sy**2.)))
 
 
+def E(x, xs1, xs2, stamp):
+        A, x01, x02, M11, M12, M22 = x
+        xs1 = xs1 - x01
+        xs2 = xs2 - x02
+        M = [[M11, M12],[M12, M22]]
+        M = np.linalg.inv(M)
+        hh = np.zeros((stamp.shape[0], stamp.shape[1]))
+        hh = (M[0,0]*xs1+M[0,1]*xs2)*xs1+ (M[1,0]*xs1 + M[1,1]*xs2)*xs2
+        #for i in range(stamp.shape[0]):
+        #        xxx = []
+        #        for j in range(stamp.shape[1]):
+        #                xxx.append(np.matmul(np.transpose(np.array(xs)[:,i,j]),np.matmul(np.linalg.inv(M),np.array(xs)[:,i,j])))
+        #        xx.append(xxx)
+        #print(np.array(hh).shape)
+        #print(np.matmul(np.array(xs),np.matmul(np.transpose(np.array(xs)),np.linalg.inv(M))).shape)
+        return 1/2 * np.sum(np.square(stamp - A * np.exp(-1/2*np.array(hh))  ))
 
-def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
+def Adap_w(x, y, x0, y0, M11, M12, M22):
+        xs1 = x - x0  
+        xs2 = y - y0  
+        M = [[M11, M12],[M12, M22]]
+        M = np.linalg.inv(M)
+        return np.exp(-1/2*((M[0,0]*xs1+M[0,1]*xs2)*xs1+ (M[1,0]*xs1 + M[1,1]*xs2)*xs2)) 
+
+def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01, psf_meas = False):
 
         stamp_size=stamp.shape[0]
 
@@ -72,22 +97,100 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
         # compute the polarisation
 
         w = gauss2d(x, y, xc, yc, sigw, sigw)
-
         xx= np.power(x-xc,2)
-        xxx= np.power(x-xc,3)
-        xxy = np.multiply(xx,y-yc)
         xy= np.multiply(x-xc,y-yc)
         yy= np.power(y-yc,2)
-        xyy = np.multiply(x-xc,yy)
-        yyy = np.power(y-yc,3)
-        
-        q111 = np.sum(xxx*w*stamp)
-        q112 = np.sum(xxy*w*stamp)
-        q122 = np.sum(xyy*w*stamp)
-        q222 = np.sum(yyy*w*stamp)
+
+        if psf_meas== True:
+            res = scipy.optimize.minimize(E,x0 = [0.01,stamp_size/2,stamp_size/2,15,1,15], args= (x, y, stamp))
+            A, x01, x02, M11, M12, M22 = res.x
+            xx= np.power(x-x01,2)
+            xy= np.multiply(x-x01,y-x02)
+            yy= np.power(y-x02,2)
+            w_adap =  Adap_w(x, y, x01, x02, 1/2*M11, 1/2*M12, 1/2*M22)
+            q11_adap=np.sum(xx*w_adap*stamp)/np.sum(w_adap*stamp)
+            q12_adap=np.sum(xy*w_adap*stamp)/np.sum(w_adap*stamp)
+            q22_adap=np.sum(yy*w_adap*stamp)/np.sum(w_adap*stamp)
+            #Q_adap = [[q11_adap, q12_adap], [q12_adap, q22_adap]]
+            
+            e1_adap = (q11_adap - q22_adap)/(q11_adap + q22_adap)
+            e2_adap = (2*q12_adap)/(q11_adap + q22_adap)
+            # print(e1_adap, e2_adap)
+            
+            M = [[q11_adap, q12_adap],[q12_adap, q22_adap]]
+            M_inv_half_adap = fractional_matrix_power(M, (-1/2))
+            # D = M11*M22-M12**2
+            # zeta = D*(M11+M22+2*np.sqrt(D))
+            # u_adap = 1/np.sqrt(zeta)*((M22 + np.sqrt(D))*(x-x01)+(-M12)*(y-x02))
+            # v_adap = 1/np.sqrt(zeta)*((M11 + np.sqrt(D))*(y-x02)+(-M12)*(x-x01))
+            u_adap = M_inv_half_adap[0][0]*(x-x01)+M_inv_half_adap[0][1]*(y-x02)
+            v_adap = M_inv_half_adap[1][0]*(x-x01)+M_inv_half_adap[1][1]*(y-x02)
+            # print(u_adap)
+            # print(x-x01)
+            
+            u4_adap = np.power(u_adap,4)
+            v4_adap = np.power(v_adap,4)
+            u3v_adap = np.multiply(np.power(u_adap,3),v_adap)
+            v3u_adap = np.multiply(np.power(v_adap,3),u_adap)
+
+            M40_adap = np.sum(u4_adap*w_adap*stamp)/np.sum(w_adap*stamp)
+            M04_adap = np.sum(v4_adap*w_adap*stamp)/np.sum(w_adap*stamp)
+            M31_adap = np.sum(u3v_adap*w_adap*stamp)/np.sum(w_adap*stamp) 
+            M13_adap = np.sum(v3u_adap*w_adap*stamp)/np.sum(w_adap*stamp)
+
+            M4_1_adap = M40_adap - M04_adap
+            M4_2_adap = 2*M31_adap + 2*M13_adap
+            xc = x01
+            yc = x02
+            
+            # q11_adap=np.sum(np.power(u_adap,2)*w_adap*stamp)
+            # q12_adap=np.sum(np.multiply(u_adap, v_adap)*w_adap*stamp)
+            # q22_adap=np.sum(np.power(v_adap,2)*w_adap*stamp)
+            
+            # e1_adap = (q11_adap - q22_adap)/(q11_adap + q22_adap)
+            # e2_adap = (2*q12_adap)/(q11_adap + q22_adap)
+            # print((q11_adap/np.sum(w_adap*stamp)*q22_adap/np.sum(w_adap*stamp)- 2*q12_adap/np.sum(w_adap*stamp))**(1/4) )
+            # print('pol with adapted weight: ',e1_adap, e2_adap)
+
+        # w = gauss2d(x, y, x01, x02, sigw, sigw)
+        # xx= np.power(x-x01,2)
+        # xy= np.multiply(x-x01,y-x02)
+        # yy= np.power(y-x02,2)
+        # print(yc, x02)
+
         q11=np.sum(xx*w*stamp)
         q12=np.sum(xy*w*stamp)
         q22=np.sum(yy*w*stamp)
+        # Q = [[q11/np.sum(w*stamp), q12/np.sum(w*stamp)], [q12/np.sum(w*stamp), q22/np.sum(w*stamp)]]
+        
+        
+        # M_inv_half = fractional_matrix_power(Q, (-1/2))
+        # u = M_inv_half[0][0]*(x-xc)+M_inv_half[0][1]*(y-yc)
+        # v = M_inv_half[1][0]*(x-xc)+M_inv_half[1][1]*(y-yc)
+
+        # u4 = np.power(u,4)
+        # v4 = np.power(v,4)
+        # u3v = np.multiply(np.power(u,3),v)
+        # v3u = np.multiply(np.power(v,3),u)
+
+        # # q11_new=np.sum(np.power(u,2)*w*stamp)
+        # # q12_new=np.sum(np.multiply(u, v)*w*stamp)
+        # # q22_new=np.sum(np.power(v,2)*w*stamp)
+        
+        # # if psf_meas== True:
+        # #     e1_new = (q11_new - q22_new)/(q11_new + q22_new)
+        # #     e2_new = (2*q12_new)/(q11_new + q22_new)
+        # #     print((q11_new/np.sum(w*stamp)*q22_new/np.sum(w*stamp)- 2*q12_new/np.sum(w*stamp))**(1/4) )
+        # #     print('pol with circular weight: ', e1_new, e2_new)
+        
+        # M40 = np.sum(u4*w*stamp)/np.sum(w*stamp)
+        # M04 = np.sum(v4*w*stamp)/np.sum(w*stamp)
+        # M31 = np.sum(u3v*w*stamp)/np.sum(w*stamp) 
+        # M13 = np.sum(v3u*w*stamp)/np.sum(w*stamp)
+        
+        
+        # M4_1 = M40 - M04
+        # M4_2 = 2*M31 + 2*M13
 
         denom= q11 + q22
 
@@ -95,6 +198,8 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
 
                 e1=(q11 - q22) / denom
                 e2=(2. * q12) / denom
+                # if psf_meas == True:
+                #     print(e1, e2)
 
                 # compute KSB polarisabilities
                 # need to precompute some of this and repeat to speed up
@@ -138,10 +243,13 @@ def ksb_moments(stamp,xc=None,yc=None,sigw=2.0,prec=0.01):
                 ksbpar['Psh11']=psh11
                 ksbpar['Psh22']=psh22
                 ksbpar['Psh12']=psh12
-                ksbpar['Q111'] = q111
-                ksbpar['Q112'] = q112
-                ksbpar['Q122'] = q122
-                ksbpar['Q222'] = q222
+                if psf_meas==True:
+                    # ksbpar['M4_1']=M4_1
+                    # ksbpar['M4_2']=M4_2
+                    ksbpar['e1_adap']=e1_adap
+                    ksbpar['e2_adap']=e2_adap
+                    ksbpar['M4_1_adap']=M4_1_adap
+                    ksbpar['M4_2_adap']=M4_2_adap
                 return ksbpar
    
 # path = config.workpath('Test')
@@ -405,20 +513,7 @@ def calculate_ksb_training(path, case):
         gal_image = galsim.fits.read(image_file)
         stamp_x_size = table.meta['STAMP_X']
         stamp_y_size = table.meta['STAMP_Y']
-        tab1  = []
-        tab2  = []
-        tab3  = []
-        tab4  = []
-        tab5  = []
-        tab6  = []
-        tab7  = []
-        tab8  = []
-        tab9  = []
-        tab10 = []
-        tab11 = []
-        tab12 = []
-        tab13 = []
-        tab14 = []
+        t = Table(names = ['e1_cal', 'e2_cal', 'e1_cal_psf', 'e2_cal_psf', 'e1_cal_psf_adap', 'e2_cal_psf_adap', 'anisotropy_corr', 'anisotropy_corr_2','M4_1_psf_adap', 'M4_2_psf_adap', 'aperture_sum', 'sigma_mom', 'sigma_mom_psf', 'rho4_mom', 'Signal_to_Noise'], dtype = ['f4','f4','f4','f4','f4','f4','f4','f4','f4','f4','f4','f4','f4','f4', 'f4'])
         PSF = galsim.fits.read(path + '/PSF_' + str(case) + '.fits')
         PSF = galsim.InterpolatedImage(PSF, scale = 0.02)
         Pixel = galsim.Pixel(scale = 0.1)
@@ -426,7 +521,7 @@ def calculate_ksb_training(path, case):
         psf_image = galsim.ImageF(table.meta['PSF_X'], table.meta['PSF_Y'], scale = 0.02)
         PSF.drawImage(psf_image,method='no_pixel') 
         my_moments_psf = galsim.hsm.FindAdaptiveMom(psf_image, guess_sig = 10, strict = (False))
-        meas_on_psf = ksb_moments(psf_image.array, sigw = sigw_sub)
+        meas_on_psf = ksb_moments(psf_image.array, sigw = sigw_sub, psf_meas=True)
         logging.info('start ksb algorithm')
         count = 0
         positions = [((stamp_x_size*5)/2., (stamp_y_size*5)/2.)]
@@ -437,12 +532,17 @@ def calculate_ksb_training(path, case):
                 print(str(count) + ' Galaxies examined in case ' + str(case))
             b = galsim.BoundsI(Galaxy['bound_x_left'], Galaxy['bound_x_right'], Galaxy['bound_y_bottom'], Galaxy['bound_y_top'])
             sub_gal_image = gal_image[b]
+            # print(sub_gal_image.array[0])
+            sigma_sky = 1.4826*np.median(abs(sub_gal_image.array[0]-np.median(sub_gal_image.array[0])))
+            my_moments2 = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 2, strict = (False)) 
+            Gain = 3.1
+            A_eff = np.pi*(3*my_moments2.moments_sigma*np.sqrt(2*np.log(2)))**2
+            Signal_to_Noise = (Gain*my_moments2.moments_amp)/np.sqrt(Gain*my_moments2.moments_amp + A_eff * (Gain*sigma_sky)**2)
             sub_gal_image = sub_gal_image.subsample(nx = 5,ny = 5)
             meas_on_galaxy = ksb_moments(sub_gal_image.array, sigw = sigw_sub)
             if meas_on_galaxy is None:
                 e1_anisotropy_correction = -10
                 e2_anisotropy_correction = -10
-                P_g11 = -10
                 e1 = -10
                 e2 = -10
             else:
@@ -451,6 +551,10 @@ def calculate_ksb_training(path, case):
                 #P_g11      = meas_on_galaxy['Psh11']-meas_on_galaxy['Psm11']/meas_on_psf['Psm11']*meas_on_psf['Psh11']
                 e1 = meas_on_galaxy['e1']
                 e2 = meas_on_galaxy['e2']
+            if meas_on_psf is None:
+                par = ['e1', 'e2', 'e1_adap', 'e2_adap', 'M4_1_adap', 'M4_2_adap']
+                for i in par:
+                    meas_on_psf[par] = -10
             phot_table = aperture_photometry(sub_gal_image.array, aperture)
             # cat = data_properties(sub_gal_image.array)
             # columns = ['label', 'xcentroid', 'ycentroid', 'semimajor_sigma','semiminor_sigma', 'orientation']
@@ -459,61 +563,20 @@ def calculate_ksb_training(path, case):
             # b = tbl['semiminor_sigma'] 
             my_moments = galsim.hsm.FindAdaptiveMom(sub_gal_image, guess_sig = 10, strict = (False)) 
             # Radius = np.sqrt( a * b )
-            tab1.append(meas_on_psf['Q122'])
-            tab2.append(meas_on_psf['Q112'])
-            tab3.append(e1_anisotropy_correction)
-            tab4.append(e1)
-            tab5.append(phot_table['aperture_sum'])
-            tab6.append(meas_on_psf['Q111'])
-            tab7.append(my_moments.moments_sigma)
-            tab10.append(my_moments_psf.moments_sigma)
-            tab8.append(my_moments.moments_rho4)
-            tab9.append(meas_on_psf['e1'])
-            tab11.append(meas_on_psf['e2'])
-            tab12.append(e2)
-            tab13.append(meas_on_psf['Q222'])
-            tab14.append(e2_anisotropy_correction)
+            print(my_moments.moments_sigma)
+            params = [e1, e2, meas_on_psf['e1'], meas_on_psf['e2'], meas_on_psf['e1_adap'], meas_on_psf['e2_adap'], e1_anisotropy_correction, e2_anisotropy_correction, meas_on_psf['M4_1_adap'], meas_on_psf['M4_2_adap'], phot_table['aperture_sum'], my_moments.moments_sigma, my_moments_psf.moments_sigma, my_moments.moments_rho4, Signal_to_Noise]
+            t.add_row(params)
             count = count + 1
-        Col_A = Column(name = 'Q112_psf', data = tab2)
-        Col_B = Column(name = 'anisotropy_corr', data = tab3)
-        Col_C = Column(name = 'e1_cal', data = tab4)
-        Col_D = Column(name = 'aperture_sum', data = tab5)
-        Col_E = Column(name = 'Q122_psf', data = tab1)
-        Col_F = Column(name = 'Q111_psf', data = tab6)
-        Col_G = Column(name = 'sigma_mom', data = tab7)
-        Col_H = Column(name = 'rho4_mom', data = tab8)
-        Col_I = Column(name = 'sigma_mom_psf', data = tab10)
-        Col_J = Column(name = 'e1_cal_psf', data = tab9)
-        Col_K = Column(name = 'e2_cal_psf', data = tab11)
-        Col_L = Column(name = 'e2_cal', data = tab12)
-        Col_M = Column(name = 'Q222_psf', data = tab13)
-        Col_N = Column(name = 'anisotropy_corr_2', data = tab14)
-        try:
-    	    table.add_columns([Col_A, Col_B, Col_C, Col_D, Col_E, Col_F, Col_G, Col_H, Col_I, Col_J, Col_K, Col_L, Col_M, Col_N])
-    	    logging.info('Add columns to table')
-        except:
-            table.replace_column(name = 'Q112_psf', col = Col_A)
-            table.replace_column(name = 'anisotropy_corr', col = Col_B)
-            table.replace_column(name = 'e1_cal', col = Col_C)
-            table.replace_column(name = 'aperture_sum', col = Col_D)
-            table.replace_column(name = 'Q122_psf', col = Col_E)
-            table.replace_column(name = 'Q111_psf', col = Col_F)
-            table.replace_column(name = 'sigma_mom', col = Col_G)
-            table.replace_column(name = 'rho4_mom', col = Col_H)
-            table.replace_column(name = 'sigma_mom_psf', col = Col_I)
-            table.replace_column(name = 'e1_cal_psf', col = Col_J)
-            table.replace_column(name = 'e2_cal_psf', col = Col_K)
-            table.replace_column(name = 'e2_cal', col = Col_L)
-            table.replace_column(name = 'Q222_psf', col = Col_M)
-            table.replace_column(name = 'anisotropy_corr_2', col = Col_N)
-            logging.info('replaced columns in table')
         print('KSB finished')
-        table.write( path + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
+        table_new = hstack([table, t])
+        table_new.write( path + '/Measured_ksb_' + str(case) + '.fits' , overwrite=True) 
         logging.info('overwritten old table with new table including e1_cal and Pg_11')
     return None
 
-#path = config.workpath('Test2')
-#calculate_ksb_training(path, 176)
+path = config.workpath('Test5')
+#t = Table.read(path + '/Measured_ksb.fits')
+#print(t['M4_2_psf'], max(abs(t['M4_2_psf'])))
+calculate_ksb_training(path, 6)
 # calculate_ksb_training(path, 1)
 # calculate_ksb_training(path, 2)
 # calculate_ksb_training(path, 3)

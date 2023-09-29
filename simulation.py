@@ -9,7 +9,6 @@ import logging
 import time
 import ksb
 import config
-import analyze
 from astropy.table import Table, vstack
 
 # start = time.time()

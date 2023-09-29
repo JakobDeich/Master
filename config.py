@@ -5,12 +5,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import time
 import threading
-#workdir = "/vol/aibn1053/data1/jdeich/work_master"
+#workdir = "/vol/aibn1080/data1/jdeich/work_master"
 workdir = '/vol/euclidraid4/data/jdeich'
 #workdir = ''
 def workpath(relpath):
     return os.path.join(workdir, relpath)
-
 
 # Gamma = Table.read('Test/Gamma.fits')
 # gamma1 = Gamma['gamma1']
@@ -34,13 +33,16 @@ def workpath(relpath):
 
 # def s(r,n):
 #     return -(1.999*n-0.327)*(r**(1/n)-1)
-
+# plt.rcParams.update({'font.size': 14})
 # x = np.linspace(0,5, 600)
-# ns = [0.5,0.75,1,2,3,4]
+# ns = [0.5,0.75,1,2,4]
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
 # for i in ns:
 #     plt.plot(x, s(x,i), label = 'n = ' + str(i))
 # plt.xlabel('radius in units of $R_e$')
 # plt.ylabel('log surface brightness in units of $I_e$')
 # plt.legend()
+# ax.set_aspect(1.0/ax.get_data_ratio(), adjustable='box')
 # plt.rcParams['font.size'] = 22
 

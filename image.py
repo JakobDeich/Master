@@ -30,6 +30,8 @@ def gal_flux(mag):
     Z_p = 24.6
     return t_exp/gain *10**(-0.4*(mag-Z_p)) 
 
+print(gal_flux(26.5))
+
 def sky_flux(mag_sky):
     t_exp = 3*565 #s
     gain = 3.1 #e/ADU
@@ -281,7 +283,7 @@ if __name__ == "__main__":
     path = config.workpath('Test/')
     # # tab.training_set_tab(5, 10, 1, 2, 64, 64,350, 350, path)
     # # # # # bounds = table['bound_x_left']
-    generate_realisations(path, 1)
+    # generate_realisations(path, 1)
     # path = config.workpath('Comparison/')
     # tab.generate_table(5, 5, 64, 64, path)
     # generate_image(path)
